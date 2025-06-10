@@ -7,4 +7,5 @@ pytest==7.1.2
 plotly_gif==0.0.3
 sb3-contrib==1.7
 jupyter
+pandas
 
