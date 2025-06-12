@@ -12,11 +12,8 @@ dependencies:
   - pytest=7.1.2
   - jupyter
   - pandas             # JJ 추가
-  - pytorch-cuda=11.8  # JJ 추가
-  - pytorch            # JJ 추가
   - pip:
     - gym==0.21.0
     - nptyping==2.3.1
     - plotly_gif==0.0.3
-    - stable-baselines3==1.8.0  # JJ 추가 : [extra] 제거하고 버전 고정
-    - sb3-contrib==1.8.0        # JJ 추가
+    - "stable-baselines3[extra]==1.8.0"  

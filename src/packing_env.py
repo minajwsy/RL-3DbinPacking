@@ -138,7 +138,7 @@ class PackingEnv(gym.Env):
 
         # Array to define the MultiDiscrete space with the height map of the container
         height_map_repr = np.ones(
-            shape=(container_size[0], container_size[1]), dtype=np.int32
+            shape=(container_size[0], container_size[1]), dtype=np.int64   # org: np.int32
         ) * (container_size[2] + 1)
         # Reshape the height map to a 1D array
         height_map_repr = np.reshape(
@@ -258,7 +258,7 @@ class PackingEnv(gym.Env):
         )
 
         # Reset the state of the environment
-        hm = np.asarray(self.container.height_map, dtype=np.int32)
+        hm = np.asarray(self.container.height_map, dtype=np.int64)    # org: np.int32
         hm = np.reshape(hm, (self.container.size[0] * self.container.size[1],))
 
         # Set the initial blank action_mask

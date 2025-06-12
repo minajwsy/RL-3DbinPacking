@@ -94,9 +94,19 @@ if __name__ == "__main__":
     env.close()
 
 ## Save gif
-    figs[0].save('../gifs/train_5_boxes.gif', format='GIF',
-                   append_images=figs[1:],
-                   save_all=True,
-                   duration=300, loop=0)
-
+    # figs[0].save('../gifs/train_5_boxes.gif', format='GIF',
+    #                append_images=figs[1:],
+    #                save_all=True,
+    #                duration=300, loop=0)
     # gif.create_gif(length=5000)
+
+# src/train.py의 97번째 줄 근처 수정
+    import datetime
+
+# 현재 시간을 포함한 고유한 파일명 생성
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    gif_filename = f'train_5_boxes_{timestamp}.gif'
+    gif_path = f'gifs/{gif_filename}'
+    
+    figs[0].save(gif_path, format='GIF', save_all=True, duration=500, loop=0)
+    print(f"GIF saved as: {gif_filename}")
