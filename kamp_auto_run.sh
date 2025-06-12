@@ -74,23 +74,40 @@ source .venv/bin/activate
 
 # GPU 확인 및 적절한 의존성 설치
 echo "=== GPU 상태 확인 및 의존성 설치 중 ==="
+
+# uv.lock 파일 삭제하여 새로 생성하도록 함
+echo "=== 기존 lock 파일 정리 중 ==="
+rm -f uv.lock
+
 if nvidia-smi > /dev/null 2>&1; then
     echo "GPU가 감지되었습니다. GPU 버전 패키지를 설치합니다."
     nvidia-smi
     
     # GPU 버전 PyTorch 설치
     uv pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
-    # 기본 의존성 설치
-    uv sync
-    echo "GPU 환경 설정 완료"
+    
+    # kaleido 호환성 문제 해결을 위한 설정
+    echo "=== 필수 패키지 개별 설치 중 ==="
+    # 핵심 패키지들을 개별적으로 설치
+    uv pip install gymnasium numpy nptyping pillow pandas jupyter pytest
+    uv pip install sb3-contrib stable-baselines3 tensorboard matplotlib opencv-python tqdm
+    uv pip install plotly --no-deps  # kaleido 의존성 제외하고 plotly만 설치
+    
+    echo "GPU 환경 설정 완료 (kaleido 제외)"
 else
     echo "GPU를 찾을 수 없습니다. CPU 버전 패키지를 설치합니다."
     
     # CPU 버전 PyTorch 설치
     uv pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
-    # 기본 의존성 설치
-    uv sync
-    echo "CPU 환경 설정 완료"
+    
+    # kaleido 호환성 문제 해결을 위한 설정
+    echo "=== 필수 패키지 개별 설치 중 ==="
+    # 핵심 패키지들을 개별적으로 설치
+    uv pip install gymnasium numpy nptyping pillow pandas jupyter pytest
+    uv pip install sb3-contrib stable-baselines3 tensorboard matplotlib opencv-python tqdm
+    uv pip install plotly --no-deps  # kaleido 의존성 제외하고 plotly만 설치
+    
+    echo "CPU 환경 설정 완료 (kaleido 제외)"
 fi
 
 # Python 경로 설정
