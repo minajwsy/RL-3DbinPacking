@@ -22,11 +22,10 @@ We follow the space representation depicted below, all coordinates and lengths o
 import copy
 from typing import List, Tuple, Union
 
-import gym
+import gymnasium as gym
 import numpy as np
 import plotly.graph_objects as go
-from gym.spaces import Discrete, MultiDiscrete
-from gym.utils import seeding
+from gymnasium.spaces import Discrete, MultiDiscrete
 from nptyping import NDArray
 
 from src.packing_kernel import Box, Container
@@ -175,7 +174,12 @@ class PackingEnv(gym.Env):
             seed: int
                 Seed for the environment.
         """
-        self.np_random, seed = seeding.np_random(seed)
+        import numpy as np
+        if seed is not None:
+            np.random.seed(seed)
+            self.np_random = np.random.RandomState(seed)
+        else:
+            self.np_random = np.random.RandomState()
         return [seed]
 
     def action_to_position(self, action: int) -> Tuple[int, NDArray]:
@@ -270,7 +274,7 @@ class PackingEnv(gym.Env):
         self.done = False
         self.seed(seed)
 
-        return self.state
+        return self.state, {}
 
     def calculate_reward(self, reward_type: str = "terminal_step") -> float:
         """calculate the reward for the action.
@@ -302,7 +306,7 @@ class PackingEnv(gym.Env):
 
         return reward
 
-    def step(self, action: int) -> Tuple[NDArray, float, bool, dict]:
+    def step(self, action: int) -> Tuple[NDArray, float, bool, bool, dict]:
         """Step the environment.
         Parameters:
         -----------
@@ -319,7 +323,7 @@ class PackingEnv(gym.Env):
         box_index, position = self.action_to_position(action)
         # if the box is a dummy box, skip the step
         if box_index >= len(self.unpacked_visible_boxes):
-            return self.state, 0, self.done, {}
+            return self.state, 0, self.done, False, {}
 
         # If it is not a dummy box, check if the action is valid
         # TO DO: add parameter check area, add info, return info
@@ -365,7 +369,7 @@ class PackingEnv(gym.Env):
             terminated = self.done
             reward = self.calculate_reward(reward_type="terminal_step")
             self.state["visible_box_sizes"] = [[0, 0, 0]] * self.num_visible_boxes
-            return self.state, reward, terminated, {}
+            return self.state, reward, terminated, False, {}
 
         if len(self.unpacked_visible_boxes) == self.num_visible_boxes:
             # Update the list of visible box sizes in the observation space
@@ -377,7 +381,7 @@ class PackingEnv(gym.Env):
             )
             terminated = False
             self.state
-            return self.state, reward, terminated, {}
+            return self.state, reward, terminated, False, {}
 
         if len(self.unpacked_visible_boxes) < self.num_visible_boxes:
             # If there are fewer boxes than the maximum number of visible boxes, add dummy boxes
@@ -391,7 +395,7 @@ class PackingEnv(gym.Env):
                 visible_box_sizes, (self.num_visible_boxes * 3,)
             )
             terminated = False
-            return self.state, reward, terminated, {}
+            return self.state, reward, terminated, False, {}
 
     # @property
     def action_masks(self) -> List[bool]:
