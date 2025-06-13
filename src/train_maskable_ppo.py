@@ -275,7 +275,7 @@ def create_demonstration_gif(model, env, timestamp):
             obs, rewards, done, truncated, info = env.step(action)
             
             # 렌더링
-            fig = env.render(mode="human")
+            fig = env.render()
             if fig is not None:
                 fig_png = fig.to_image(format="png")
                 buf = io.BytesIO(fig_png)

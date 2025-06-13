@@ -86,7 +86,7 @@ if __name__ == "__main__":
     while not (done or truncated):
         action, _states = model.predict(obs, deterministic=True)
         obs, rewards, done, truncated, info = orig_env.step(action)
-        fig = env.render(mode="human")
+        fig = env.render()
         fig_png = fig.to_image(format="png")
         buf = io.BytesIO(fig_png)
         img = Image.open(buf)

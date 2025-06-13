@@ -421,22 +421,21 @@ class PackingEnv(gym.Env):
             )
         return [x == 1 for x in act_mask.flatten()]
 
-    def render(self, mode=None) -> Union[go.Figure, NDArray]:
-
+    def render(self) -> Union[go.Figure, NDArray, None]:
         """Render the environment.
-        Args:
-            mode: Mode to render the environment.
+        
+        렌더링 모드는 환경 생성 시 render_mode 파라미터로 설정됩니다.
         """
+        
+        if self.render_mode is None or self.render_mode == "None":
+            return None
 
-        if mode is None:
-            pass
-
-        elif mode == "human":
+        elif self.render_mode == "human":
             fig = self.container.plot()
             # fig.show()
             return fig
         #
-        elif mode == "rgb_array":
+        elif self.render_mode == "rgb_array":
             import io
             from PIL import Image
 
@@ -445,7 +444,7 @@ class PackingEnv(gym.Env):
             img = Image.open(buf)
             return np.asarray(img, dtype=np.int8)
         else:
-            raise NotImplementedError
+            raise NotImplementedError(f"Render mode '{self.render_mode}' is not supported")
 
     def close(self) -> None:
         """Close the environment."""
@@ -454,7 +453,7 @@ class PackingEnv(gym.Env):
 
 if __name__ == "__main__":
     from src.utils import boxes_generator
-    from gym import make
+    from gymnasium import make
     import warnings
     from plotly_gif import GIF
 
