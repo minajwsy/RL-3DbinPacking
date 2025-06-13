@@ -468,7 +468,7 @@ if __name__ == "__main__":
         box_sizes=boxes_generator([10, 10, 10], 64, 42),
         num_visible_boxes=1,
     )
-    obs = env.reset()
+    obs, info = env.reset()
 
     gif = GIF(gif_name="random_rollout.gif", gif_path="../gifs")
     for step_num in range(80):
@@ -476,8 +476,8 @@ if __name__ == "__main__":
         gif.create_image(fig)
         action_mask = obs["action_mask"]
         action = env.action_space.sample(mask=action_mask)
-        obs, reward, done, info = env.step(action)
-        if done:
+        obs, reward, done, truncated, info = env.step(action)
+        if done or truncated:
             break
 
     gif.create_gif()

@@ -257,19 +257,22 @@ def create_demonstration_gif(model, env, timestamp):
     학습된 모델의 시연 GIF 생성 (기존 코드 스타일 유지)
     """
     try:
-        obs = env.reset()
+        # Gymnasium API: env.reset()는 (obs, info) 튜플을 반환
+        obs, info = env.reset()
         done = False
+        truncated = False
         figs = []
         step_count = 0
         max_steps = 100  # 무한 루프 방지
         
         print("시연 시작...")
         
-        while not done and step_count < max_steps:
+        while not (done or truncated) and step_count < max_steps:
             # 액션 마스크 가져오기
             action_masks = get_action_masks(env)
             action, _states = model.predict(obs, action_masks=action_masks, deterministic=True)
-            obs, rewards, done, info = env.step(action)
+            # Gymnasium API: env.step()는 (obs, reward, terminated, truncated, info)를 반환
+            obs, rewards, done, truncated, info = env.step(action)
             
             # 렌더링
             fig = env.render(mode="human")
@@ -299,6 +302,44 @@ def create_demonstration_gif(model, env, timestamp):
             
     except Exception as e:
         print(f"GIF 생성 중 오류 발생: {e}")
+
+
+def evaluate_model(model_path, num_episodes=5):
+    """
+    저장된 모델 평가 함수 (kamp_auto_run.sh에서 호출)
+    """
+    try:
+        print(f"모델 평가 시작: {model_path}")
+        
+        # 모델 로드
+        model = MaskablePPO.load(model_path)
+        
+        # 평가용 환경 생성
+        eval_env = make_env(
+            container_size=[10, 10, 10],
+            num_boxes=64,
+            num_visible_boxes=3,
+            seed=42,
+            render_mode=None,
+            random_boxes=False,
+            only_terminal_reward=False,
+        )
+        
+        # 평가 실행
+        mean_reward, std_reward = evaluate_policy(
+            model, eval_env, n_eval_episodes=num_episodes, deterministic=True
+        )
+        
+        print(f"평가 완료 - 평균 보상: {mean_reward:.4f} ± {std_reward:.4f}")
+        
+        # 환경 정리
+        eval_env.close()
+        
+        return mean_reward, std_reward
+        
+    except Exception as e:
+        print(f"모델 평가 중 오류: {e}")
+        return None, None
 
 
 def main():

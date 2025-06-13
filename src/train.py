@@ -77,14 +77,15 @@ if __name__ == "__main__":
     print("done training")
     model.save("ppo_mask")
 
-    obs = orig_env.reset()
+    obs, info = orig_env.reset()
     done = False
+    truncated = False
     gif = GIF(gif_name="trained_5boxes.gif", gif_path="../gifs")
     figs = []
 
-    while not done:
+    while not (done or truncated):
         action, _states = model.predict(obs, deterministic=True)
-        obs, rewards, done, info = orig_env.step(action)
+        obs, rewards, done, truncated, info = orig_env.step(action)
         fig = env.render(mode="human")
         fig_png = fig.to_image(format="png")
         buf = io.BytesIO(fig_png)
