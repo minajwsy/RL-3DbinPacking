@@ -67,3 +67,26 @@ The following updates have been made to the repository:
 The following updates have been made to the repository:
 - Updated the demo notebook for training agents with Maskable PPO in Google colab.
 - Fixed issues with the tests.
+
+## 🚀 Update: 실시간 모니터링 기능 추가 (2024년 12월)
+새로운 **실시간 모니터링 및 성능 분석** 기능이 추가되었습니다!
+
+### ✨ 주요 기능
+- **실시간 학습 진행 상황 모니터링**: 에피소드별 보상, 성공률, 평가 성능을 실시간으로 추적
+- **자동 시각화**: 4개 차트로 구성된 종합 대시보드 자동 생성 및 업데이트
+- **지능형 성과 분석**: 학습 안정성, 성공률 등급, 개선 제안 자동 생성
+- **서버 환경 최적화**: GUI 없는 KAMP 서버에서도 완벽 작동
+
+### 🛠️ 간단한 사용법
+```bash
+# 실시간 모니터링과 함께 학습 시작
+python -m src.train_maskable_ppo --timesteps 100000
+
+# 기존 결과 분석
+python -m src.train_maskable_ppo --analyze-only results/training_stats_YYYYMMDD_HHMMSS.npy
+
+# KAMP 서버 자동 실행 (모니터링 포함)
+./kamp_auto_run.sh master
+```
+
+📖 **자세한 사용법**: [`REALTIME_MONITORING_GUIDE.md`](REALTIME_MONITORING_GUIDE.md) 를 참조하세요.
