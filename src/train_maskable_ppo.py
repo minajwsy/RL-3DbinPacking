@@ -25,6 +25,7 @@ from matplotlib.animation import FuncAnimation
 from sb3_contrib import MaskablePPO
 from sb3_contrib.common.maskable.evaluation import evaluate_policy
 from sb3_contrib.common.maskable.utils import get_action_masks
+from sb3_contrib.common.wrappers import ActionMasker
 from stable_baselines3.common.callbacks import BaseCallback, EvalCallback, CheckpointCallback
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.env_checker import check_env
@@ -732,31 +733,66 @@ def make_env(
         improved_reward_shaping: 개선된 보상 쉐이핑 사용 여부
     """
     def _init():
-        # 기본 환경 생성
-        env = gym.make(
-            "rl_3d_bin_packing:BinPacking-v1",
-            container_size=container_size,
-            max_num_boxes=num_boxes,
-            num_visible_boxes=num_visible_boxes,
-            max_num_boxes_to_pack=num_boxes,
-            render_mode=render_mode,
-            random_boxes=random_boxes,
-            only_terminal_reward=only_terminal_reward,
-        )
-        
-        # 개선된 보상 쉐이핑 적용
-        if improved_reward_shaping:
-            env = ImprovedRewardWrapper(env)
-        
-        # 액션 마스킹 래퍼 적용
-        env = ActionMaskingWrapper(env)
-        
-        # 시드 설정
-        env.reset(seed=seed)
-        env.action_space.seed(seed)
-        env.observation_space.seed(seed)
-        
-        return env
+        try:
+            # 기본 환경 생성 (여러 환경 ID 시도)
+            env_ids = [
+                "rl_3d_bin_packing:BinPacking-v1",
+                "BinPacking-v1", 
+                "PackingEnv-v0"
+            ]
+            
+            env = None
+            for env_id in env_ids:
+                try:
+                    env = gym.make(
+                        env_id,
+                        container_size=container_size,
+                        max_num_boxes=num_boxes,
+                        num_visible_boxes=num_visible_boxes,
+                        max_num_boxes_to_pack=num_boxes,
+                        render_mode=render_mode,
+                        random_boxes=random_boxes,
+                        only_terminal_reward=only_terminal_reward,
+                    )
+                    print(f"환경 생성 성공: {env_id}")
+                    break
+                except Exception as e:
+                    print(f"환경 {env_id} 생성 실패: {e}")
+                    continue
+            
+            if env is None:
+                raise RuntimeError("모든 환경 ID에서 환경 생성에 실패했습니다.")
+            
+            # 개선된 보상 쉐이핑 적용
+            if improved_reward_shaping:
+                env = ImprovedRewardWrapper(env)
+            
+            # 액션 마스킹 래퍼 적용
+            def mask_fn(env_instance):
+                try:
+                    return get_action_masks(env_instance)
+                except Exception as e:
+                    print(f"액션 마스크 생성 실패: {e}")
+                    # 기본 마스크 반환 (모든 액션 허용)
+                    return np.ones(env_instance.action_space.n, dtype=bool)
+            
+            env = ActionMasker(env, mask_fn)
+            
+            # 시드 설정
+            try:
+                env.reset(seed=seed)
+                env.action_space.seed(seed)
+                env.observation_space.seed(seed)
+            except Exception as e:
+                print(f"시드 설정 실패: {e}")
+                # 시드 없이 리셋 시도
+                env.reset()
+            
+            return env
+            
+        except Exception as e:
+            print(f"환경 생성 중 오류 발생: {e}")
+            raise e
     
     return _init
 
@@ -977,6 +1013,415 @@ def evaluate_model(model_path, num_episodes=5):
         return None, None
 
 
+def train_and_evaluate(
+    container_size=[10, 10, 10],
+    num_boxes=64,
+    num_visible_boxes=3,
+    total_timesteps=100000,
+    eval_freq=10000,
+    seed=42,
+    force_cpu=False,
+    save_gif=True,
+    curriculum_learning=True,  # 새로 추가: 커리큘럼 학습
+    improved_rewards=True,     # 새로 추가: 개선된 보상
+):
+    """
+    Maskable PPO 학습 및 평가 함수 (개선된 버전)
+    
+    Args:
+        container_size: 컨테이너 크기
+        num_boxes: 박스 개수
+        num_visible_boxes: 가시 박스 개수
+        total_timesteps: 총 학습 스텝 수
+        eval_freq: 평가 주기
+        seed: 랜덤 시드
+        force_cpu: CPU 강제 사용 여부
+        save_gif: GIF 저장 여부
+        curriculum_learning: 커리큘럼 학습 사용 여부
+        improved_rewards: 개선된 보상 사용 여부
+    """
+    
+    print("=== 개선된 Maskable PPO 3D Bin Packing 학습 시작 ===")
+    log_system_info()
+    
+    # 디바이스 설정
+    device_config = setup_training_device(verbose=True)
+    device = get_device(force_cpu=force_cpu)
+    
+    # 개선된 하이퍼파라미터 설정
+    if curriculum_learning:
+        print("🎓 커리큘럼 학습 모드 활성화")
+        # 커리큘럼 학습: 점진적으로 난이도 증가
+        initial_boxes = max(8, num_boxes // 4)  # 처음엔 더 적은 박스로 시작
+        current_boxes = initial_boxes
+    else:
+        current_boxes = num_boxes
+    
+    # 타임스탬프
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    
+    # 디렉토리 생성
+    os.makedirs("models", exist_ok=True)
+    os.makedirs("results", exist_ok=True)
+    os.makedirs("logs", exist_ok=True)
+    os.makedirs("gifs", exist_ok=True)
+    
+    # 개선된 환경 생성
+    env = make_env(
+        container_size=container_size,
+        num_boxes=current_boxes,
+        num_visible_boxes=num_visible_boxes,
+        seed=seed,
+        render_mode=None,
+        random_boxes=False,
+        only_terminal_reward=False,  # 항상 중간 보상 사용
+        improved_reward_shaping=improved_rewards,  # 개선된 보상 쉐이핑 적용
+    )()
+    
+    # 환경 체크
+    print("환경 유효성 검사 중...")
+    check_env(env, warn=True)
+    
+    # 평가용 환경 생성
+    eval_env = make_env(
+        container_size=container_size,
+        num_boxes=current_boxes,
+        num_visible_boxes=num_visible_boxes,
+        seed=seed+1,
+        render_mode="human" if save_gif else None,
+        random_boxes=False,
+        only_terminal_reward=False,  # 평가에서는 항상 중간 보상 사용
+        improved_reward_shaping=improved_rewards,
+    )()
+    
+    # 모니터링 설정
+    env = Monitor(env, f"logs/training_monitor_{timestamp}.csv")
+    eval_env = Monitor(eval_env, f"logs/eval_monitor_{timestamp}.csv")
+    
+    print(f"환경 설정 완료:")
+    print(f"  - 컨테이너 크기: {container_size}")
+    print(f"  - 박스 개수: {current_boxes} (최종 목표: {num_boxes})")
+    print(f"  - 가시 박스 개수: {num_visible_boxes}")
+    print(f"  - 액션 스페이스: {env.action_space}")
+    print(f"  - 관찰 스페이스: {env.observation_space}")
+    
+    # 개선된 콜백 설정
+    callbacks = []
+    
+    # 실시간 모니터링 콜백 (개선된 버전)
+    monitor_callback = RealTimeMonitorCallback(
+        eval_env=eval_env,
+        eval_freq=max(eval_freq // 3, 1500),  # 더 자주 평가
+        n_eval_episodes=5,
+        verbose=1,
+        update_freq=max(eval_freq // 15, 500)  # 더 자주 업데이트
+    )
+    callbacks.append(monitor_callback)
+    
+    # 커리큘럼 학습 콜백 추가
+    if curriculum_learning:
+        curriculum_callback = CurriculumLearningCallback(
+            container_size=container_size,
+            initial_boxes=initial_boxes,
+            target_boxes=num_boxes,
+            num_visible_boxes=num_visible_boxes,
+            success_threshold=0.6,  # 60% 성공률 달성 시 난이도 증가
+            verbose=1
+        )
+        callbacks.append(curriculum_callback)
+    
+    # 평가 콜백 (기존 유지)
+    eval_callback = EvalCallback(
+        eval_env,
+        best_model_save_path="models/best_model",
+        log_path="logs/eval_logs",
+        eval_freq=eval_freq,
+        n_eval_episodes=5,
+        deterministic=True,
+        render=False,
+    )
+    callbacks.append(eval_callback)
+    
+    # 체크포인트 콜백 (기존 유지)
+    checkpoint_callback = CheckpointCallback(
+        save_freq=eval_freq,
+        save_path="models/checkpoints",
+        name_prefix=f"rl_model_{timestamp}",
+    )
+    callbacks.append(checkpoint_callback)
+    
+    # 개선된 하이퍼파라미터 설정
+    improved_config = {
+        "learning_rate": 5e-4,  # 더 높은 학습률
+        "n_steps": 2048,        # 더 많은 스텝
+        "batch_size": 256,      # 더 큰 배치 크기
+        "n_epochs": 10,         # 더 많은 에포크
+        "gamma": 0.995,         # 더 높은 감가율
+        "gae_lambda": 0.95,     # GAE 람다
+        "clip_range": 0.2,      # PPO 클립 범위
+        "ent_coef": 0.01,       # 엔트로피 계수
+        "vf_coef": 0.5,         # 가치 함수 계수
+        "max_grad_norm": 0.5,   # 그래디언트 클리핑
+    }
+    
+    # 모델 생성 (개선된 하이퍼파라미터)
+    print("\n=== 개선된 모델 생성 중 ===")
+    model = MaskablePPO(
+        "MultiInputPolicy",
+        env,
+        learning_rate=improved_config["learning_rate"],
+        n_steps=improved_config["n_steps"],
+        batch_size=improved_config["batch_size"],
+        n_epochs=improved_config["n_epochs"],
+        gamma=improved_config["gamma"],
+        gae_lambda=improved_config["gae_lambda"],
+        clip_range=improved_config["clip_range"],
+        ent_coef=improved_config["ent_coef"],
+        vf_coef=improved_config["vf_coef"],
+        max_grad_norm=improved_config["max_grad_norm"],
+        verbose=1,
+        tensorboard_log="logs/tensorboard",
+        device=str(device),
+        seed=seed,
+        policy_kwargs=dict(
+            activation_fn=torch.nn.ReLU,
+            net_arch=[dict(pi=[256, 256, 128], vf=[256, 256, 128])],  # 더 큰 네트워크
+        ),
+    )
+    
+    print(f"개선된 모델 파라미터:")
+    print(f"  - 정책: MultiInputPolicy")
+    print(f"  - 학습률: {improved_config['learning_rate']}")
+    print(f"  - 배치 크기: {improved_config['batch_size']}")
+    print(f"  - 스텝 수: {improved_config['n_steps']}")
+    print(f"  - 에포크 수: {improved_config['n_epochs']}")
+    print(f"  - 감가율: {improved_config['gamma']}")
+    print(f"  - 엔트로피 계수: {improved_config['ent_coef']}")
+    print(f"  - 네트워크: [256, 256, 128]")
+    print(f"  - 디바이스: {device}")
+    
+    # 학습 시작
+    print(f"\n=== 개선된 학습 시작 (총 {total_timesteps:,} 스텝) ===")
+    print(f"실시간 모니터링 활성화 - 매 {max(eval_freq // 3, 1500):,} 스텝마다 평가")
+    print(f"빠른 업데이트 - 매 {max(eval_freq // 15, 500):,} 스텝마다 차트 업데이트")
+    print(f"TensorBoard 로그: tensorboard --logdir=logs/tensorboard")
+    print(f"시작 시간: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    start_time = time.time()
+    
+    try:
+        model.learn(
+            total_timesteps=total_timesteps,
+            callback=callbacks,
+            progress_bar=True,
+            tb_log_name=f"improved_maskable_ppo_{timestamp}",
+        )
+        
+        training_time = time.time() - start_time
+        print(f"\n개선된 학습 완료! 소요 시간: {training_time:.2f}초")
+        
+        # 모델 저장
+        model_path = f"models/improved_ppo_mask_{timestamp}"
+        model.save(model_path)
+        print(f"개선된 모델 저장 완료: {model_path}")
+        
+        # 최종 평가
+        print("\n=== 최종 모델 평가 ===")
+        mean_reward, std_reward = evaluate_policy(
+            model, eval_env, n_eval_episodes=10, deterministic=True
+        )
+        print(f"평균 보상: {mean_reward:.4f} ± {std_reward:.4f}")
+        
+        # GIF 생성 (기존 코드 스타일 유지)
+        if save_gif:
+            print("\n=== GIF 생성 중 ===")
+            create_demonstration_gif(model, eval_env, timestamp)
+        
+        # 결과 저장
+        results = {
+            "timestamp": timestamp,
+            "total_timesteps": total_timesteps,
+            "training_time": training_time,
+            "mean_reward": mean_reward,
+            "std_reward": std_reward,
+            "container_size": container_size,
+            "num_boxes": num_boxes,
+            "device": str(device),
+            "model_path": model_path,
+            "improved_config": improved_config,
+            "curriculum_learning": curriculum_learning,
+            "improved_rewards": improved_rewards,
+        }
+        
+        # 결과를 텍스트 파일로 저장
+        results_path = f"results/improved_training_results_{timestamp}.txt"
+        with open(results_path, "w") as f:
+            f.write("=== 개선된 Maskable PPO 3D Bin Packing 학습 결과 ===\n")
+            for key, value in results.items():
+                f.write(f"{key}: {value}\n")
+        
+        print(f"개선된 결과 저장 완료: {results_path}")
+        
+        # 학습 통계 파일 확인 및 성과 분석
+        stats_file = f"results/comprehensive_training_stats_{timestamp}.npy"
+        if os.path.exists(stats_file):
+            print("\n=== 자동 성과 분석 시작 ===")
+            analyze_training_performance(stats_file)
+            
+            # 최종 대시보드 생성
+            dashboard_fig = create_live_dashboard(stats_file)
+            if dashboard_fig:
+                dashboard_path = f"results/improved_final_dashboard_{timestamp}.png"
+                dashboard_fig.savefig(dashboard_path, dpi=300, bbox_inches='tight')
+                print(f"개선된 최종 대시보드 저장: {dashboard_path}")
+                plt.close(dashboard_fig)
+        
+        return model, results
+        
+    except KeyboardInterrupt:
+        print("\n학습이 중단되었습니다.")
+        model.save(f"models/interrupted_improved_model_{timestamp}")
+        return model, None
+    
+    except Exception as e:
+        print(f"\n학습 중 오류 발생: {e}")
+        model.save(f"models/error_improved_model_{timestamp}")
+        raise e
+
+
+class CurriculumLearningCallback(BaseCallback):
+    """
+    커리큘럼 학습 콜백 클래스
+    성공률에 따라 점진적으로 박스 개수(난이도)를 증가시킵니다.
+    """
+    
+    def __init__(
+        self,
+        container_size,
+        initial_boxes,
+        target_boxes,
+        num_visible_boxes,
+        success_threshold=0.6,
+        curriculum_steps=5,
+        patience=5,
+        verbose=0,
+    ):
+        super().__init__(verbose)
+        self.container_size = container_size
+        self.initial_boxes = initial_boxes
+        self.target_boxes = target_boxes
+        self.num_visible_boxes = num_visible_boxes
+        self.success_threshold = success_threshold
+        self.curriculum_steps = curriculum_steps
+        self.patience = patience
+        self.verbose = verbose
+        
+        # 커리큘럼 단계 설정
+        self.current_boxes = initial_boxes
+        self.box_increments = []
+        if target_boxes > initial_boxes:
+            step_size = (target_boxes - initial_boxes) // curriculum_steps
+            for i in range(curriculum_steps):
+                next_boxes = initial_boxes + (i + 1) * step_size
+                if next_boxes > target_boxes:
+                    next_boxes = target_boxes
+                self.box_increments.append(next_boxes)
+            # 마지막 단계는 항상 target_boxes
+            if self.box_increments[-1] != target_boxes:
+                self.box_increments.append(target_boxes)
+        
+        # 성과 추적 변수
+        self.evaluation_count = 0
+        self.consecutive_successes = 0
+        self.curriculum_level = 0
+        self.last_success_rate = 0.0
+        
+        if self.verbose >= 1:
+            print(f"🎓 커리큘럼 학습 초기화:")
+            print(f"   - 시작 박스 수: {self.initial_boxes}")
+            print(f"   - 목표 박스 수: {self.target_boxes}")
+            print(f"   - 단계별 증가: {self.box_increments}")
+            print(f"   - 성공 임계값: {self.success_threshold}")
+    
+    def _on_step(self) -> bool:
+        return True
+    
+    def _on_rollout_end(self) -> None:
+        """롤아웃 종료 시 호출되는 메서드"""
+        # 평가 결과 확인
+        if hasattr(self.model, 'ep_info_buffer') and len(self.model.ep_info_buffer) > 0:
+            # 최근 에피소드들의 성공률 계산
+            recent_episodes = list(self.model.ep_info_buffer)[-20:]  # 최근 20개 에피소드
+            if len(recent_episodes) >= 10:  # 충분한 데이터가 있을 때만
+                # 보상을 기반으로 성공률 계산 (보상 > 0.5인 경우 성공으로 간주)
+                rewards = [ep.get('r', 0) for ep in recent_episodes]
+                success_rate = sum(1 for r in rewards if r > 0.5) / len(rewards)
+                
+                self.last_success_rate = success_rate
+                self.evaluation_count += 1
+                
+                # 성공률이 임계값을 넘으면 난이도 증가 고려
+                if success_rate >= self.success_threshold:
+                    self._increase_difficulty()
+    
+    def _increase_difficulty(self):
+        """난이도 증가 (박스 개수 증가)"""
+        if self.curriculum_level < len(self.box_increments):
+            new_boxes = self.box_increments[self.curriculum_level]
+            
+            if self.verbose >= 1:
+                print(f"\n🎯 커리큘럼 학습: 난이도 증가!")
+                print(f"   - 이전 박스 수: {self.current_boxes}")
+                print(f"   - 새로운 박스 수: {new_boxes}")
+                print(f"   - 현재 성공률: {self.last_success_rate:.1%}")
+                print(f"   - 연속 성공 횟수: {self.consecutive_successes}")
+            
+            self.current_boxes = new_boxes
+            self.curriculum_level += 1
+            self.consecutive_successes = 0
+            
+            # 환경 재생성
+            self._update_environment()
+    
+    def _update_environment(self):
+        """환경을 새로운 박스 개수로 업데이트"""
+        try:
+            # 새로운 환경 생성
+            new_env = make_env(
+                container_size=self.container_size,
+                num_boxes=self.current_boxes,
+                num_visible_boxes=self.num_visible_boxes,
+                seed=42,
+                render_mode=None,
+                random_boxes=False,
+                only_terminal_reward=False,
+            )
+            
+            # 모니터링 추가
+            from stable_baselines3.common.monitor import Monitor
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            new_env = Monitor(new_env, f"logs/curriculum_monitor_{timestamp}.csv")
+            
+            # 모델의 환경 교체
+            self.model.set_env(new_env)
+            
+            if self.verbose >= 1:
+                print(f"   - 환경 업데이트 완료: {self.current_boxes}개 박스")
+                
+        except Exception as e:
+            if self.verbose >= 1:
+                print(f"   - 환경 업데이트 실패: {e}")
+    
+    def get_current_difficulty(self):
+        """현재 난이도 정보 반환"""
+        return {
+            "current_boxes": self.current_boxes,
+            "curriculum_level": self.curriculum_level,
+            "max_level": len(self.box_increments),
+            "success_rate": self.last_success_rate,
+            "consecutive_successes": self.consecutive_successes,
+        }
+
+
 def main():
     """메인 함수 (개선된 버전)"""
     import argparse
@@ -1115,140 +1560,6 @@ def main():
             print(f"❌ 오류 발생: {e}")
             import traceback
             traceback.print_exc()
-
-
-class CurriculumLearningCallback(BaseCallback):
-    """
-    커리큘럼 학습 콜백 클래스
-    성공률에 따라 점진적으로 박스 개수(난이도)를 증가시킵니다.
-    """
-    
-    def __init__(
-        self,
-        container_size,
-        initial_boxes,
-        target_boxes,
-        num_visible_boxes,
-        success_threshold=0.6,
-        curriculum_steps=5,
-        patience=5,
-        verbose=0,
-    ):
-        super().__init__(verbose)
-        self.container_size = container_size
-        self.initial_boxes = initial_boxes
-        self.target_boxes = target_boxes
-        self.num_visible_boxes = num_visible_boxes
-        self.success_threshold = success_threshold
-        self.curriculum_steps = curriculum_steps
-        self.patience = patience
-        self.verbose = verbose
-        
-        # 커리큘럼 단계 설정
-        self.current_boxes = initial_boxes
-        self.box_increments = []
-        if target_boxes > initial_boxes:
-            step_size = (target_boxes - initial_boxes) // curriculum_steps
-            for i in range(curriculum_steps):
-                next_boxes = initial_boxes + (i + 1) * step_size
-                if next_boxes > target_boxes:
-                    next_boxes = target_boxes
-                self.box_increments.append(next_boxes)
-            # 마지막 단계는 항상 target_boxes
-            if self.box_increments[-1] != target_boxes:
-                self.box_increments.append(target_boxes)
-        
-        # 성과 추적 변수
-        self.evaluation_count = 0
-        self.consecutive_successes = 0
-        self.curriculum_level = 0
-        self.last_success_rate = 0.0
-        
-        if self.verbose >= 1:
-            print(f"🎓 커리큘럼 학습 초기화:")
-            print(f"   - 시작 박스 수: {self.initial_boxes}")
-            print(f"   - 목표 박스 수: {self.target_boxes}")
-            print(f"   - 단계별 증가: {self.box_increments}")
-            print(f"   - 성공 임계값: {self.success_threshold}")
-    
-    def _on_step(self) -> bool:
-        return True
-    
-    def _on_rollout_end(self) -> None:
-        """롤아웃 종료 시 호출되는 메서드"""
-        # 평가 결과 확인
-        if hasattr(self.model, 'ep_info_buffer') and len(self.model.ep_info_buffer) > 0:
-            # 최근 에피소드들의 성공률 계산
-            recent_episodes = list(self.model.ep_info_buffer)[-20:]  # 최근 20개 에피소드
-            if len(recent_episodes) >= 10:  # 충분한 데이터가 있을 때만
-                # 보상을 기반으로 성공률 계산 (보상 > 0.5인 경우 성공으로 간주)
-                rewards = [ep.get('r', 0) for ep in recent_episodes]
-                success_rate = sum(1 for r in rewards if r > 0.5) / len(rewards)
-                
-                self.last_success_rate = success_rate
-                self.evaluation_count += 1
-                
-                # 성공률이 임계값을 넘으면 난이도 증가 고려
-                if success_rate >= self.success_threshold:
-                    self._increase_difficulty()
-    
-    def _increase_difficulty(self):
-        """난이도 증가 (박스 개수 증가)"""
-        if self.curriculum_level < len(self.box_increments):
-            new_boxes = self.box_increments[self.curriculum_level]
-            
-            if self.verbose >= 1:
-                print(f"\n🎯 커리큘럼 학습: 난이도 증가!")
-                print(f"   - 이전 박스 수: {self.current_boxes}")
-                print(f"   - 새로운 박스 수: {new_boxes}")
-                print(f"   - 현재 성공률: {self.last_success_rate:.1%}")
-                print(f"   - 연속 성공 횟수: {self.consecutive_successes}")
-            
-            self.current_boxes = new_boxes
-            self.curriculum_level += 1
-            self.consecutive_successes = 0
-            
-            # 환경 재생성
-            self._update_environment()
-    
-    def _update_environment(self):
-        """환경을 새로운 박스 개수로 업데이트"""
-        try:
-            # 새로운 환경 생성
-            new_env = make_env(
-                container_size=self.container_size,
-                num_boxes=self.current_boxes,
-                num_visible_boxes=self.num_visible_boxes,
-                seed=42,
-                render_mode=None,
-                random_boxes=False,
-                only_terminal_reward=False,
-            )
-            
-            # 모니터링 추가
-            from stable_baselines3.common.monitor import Monitor
-            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            new_env = Monitor(new_env, f"logs/curriculum_monitor_{timestamp}.csv")
-            
-            # 모델의 환경 교체
-            self.model.set_env(new_env)
-            
-            if self.verbose >= 1:
-                print(f"   - 환경 업데이트 완료: {self.current_boxes}개 박스")
-                
-        except Exception as e:
-            if self.verbose >= 1:
-                print(f"   - 환경 업데이트 실패: {e}")
-    
-    def get_current_difficulty(self):
-        """현재 난이도 정보 반환"""
-        return {
-            "current_boxes": self.current_boxes,
-            "curriculum_level": self.curriculum_level,
-            "max_level": len(self.box_increments),
-            "success_rate": self.last_success_rate,
-            "consecutive_successes": self.consecutive_successes,
-        }
 
 
 if __name__ == "__main__":
