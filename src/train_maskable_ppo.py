@@ -44,12 +44,14 @@ class RealTimeMonitorCallback(BaseCallback):
     """
     실시간 모니터링을 위한 커스텀 콜백 클래스
     학습 진행 상황을 실시간으로 추적하고 시각화합니다.
+    활용률, 안정성 지표 포함한 종합적인 성능 모니터링 제공
     """
-    def __init__(self, eval_env, eval_freq=5000, n_eval_episodes=5, verbose=1):
+    def __init__(self, eval_env, eval_freq=5000, n_eval_episodes=5, verbose=1, update_freq=1000):
         super().__init__(verbose)
         self.eval_env = eval_env
         self.eval_freq = eval_freq
         self.n_eval_episodes = n_eval_episodes
+        self.update_freq = update_freq  # 그래프 업데이트 주기 (더 빈번한 업데이트용)
         
         # 성능 지표 저장용 리스트
         self.timesteps = []
@@ -60,17 +62,30 @@ class RealTimeMonitorCallback(BaseCallback):
         self.success_rates = []
         self.episode_lengths = []
         
-        # 실시간 플롯 설정
-        self.fig, self.axes = plt.subplots(2, 2, figsize=(15, 10))
-        self.fig.suptitle('실시간 학습 진행 상황', fontsize=16)
+        # 새로 추가: 활용률 및 안정성 지표
+        self.utilization_rates = []  # 활용률 (컨테이너 공간 활용도)
+        self.eval_utilization_rates = []  # 평가 시 활용률
+        self.reward_stability = []  # 보상 안정성 (표준편차)
+        self.utilization_stability = []  # 활용률 안정성
+        self.learning_smoothness = []  # 학습 곡선 smoothness
+        self.max_utilization_rates = []  # 최대 활용률 기록
+        
+        # 실시간 플롯 설정 (3x2 그리드로 확장)
+        self.fig, self.axes = plt.subplots(3, 2, figsize=(16, 12))
+        self.fig.suptitle('실시간 학습 진행 상황 - 성능 지표 종합 모니터링', fontsize=16)
         plt.ion()  # 인터랙티브 모드 활성화
         
-        # 마지막 평가 시점
+        # 마지막 평가 및 업데이트 시점
         self.last_eval_time = 0
+        self.last_update_time = 0
         
         # 에피소드별 통계
         self.current_episode_rewards = []
         self.current_episode_lengths = []
+        self.current_episode_utilizations = []
+        
+        # 안정성 계산을 위한 윈도우 크기
+        self.stability_window = 50
         
     def _on_training_start(self) -> None:
         """학습 시작 시 호출"""
@@ -84,30 +99,48 @@ class RealTimeMonitorCallback(BaseCallback):
         """매 스텝마다 호출"""
         # 에피소드 완료 체크
         if self.locals.get('dones', [False])[0]:
-            # 에피소드 보상 기록
+            # 에피소드 보상 및 활용률 기록
             if 'episode' in self.locals.get('infos', [{}])[0]:
                 episode_info = self.locals['infos'][0]['episode']
                 episode_reward = episode_info['r']
                 episode_length = episode_info['l']
                 
+                # 활용률 계산 (보상이 곧 활용률이므로 동일)
+                episode_utilization = max(0.0, episode_reward)  # 음수 보상 처리
+                
                 self.current_episode_rewards.append(episode_reward)
                 self.current_episode_lengths.append(episode_length)
+                self.current_episode_utilizations.append(episode_utilization)
+                
                 self.timesteps.append(self.num_timesteps)
                 self.episode_rewards.append(episode_reward)
                 self.episode_lengths.append(episode_length)
+                self.utilization_rates.append(episode_utilization)
                 
-                # 실시간 출력
+                # 실시간 출력 (더 자세한 정보 포함)
                 if len(self.current_episode_rewards) % 10 == 0:
                     recent_rewards = self.current_episode_rewards[-10:]
+                    recent_utilizations = self.current_episode_utilizations[-10:]
+                    
                     mean_reward = np.mean(recent_rewards)
+                    mean_utilization = np.mean(recent_utilizations)
+                    max_utilization = np.max(recent_utilizations) if recent_utilizations else 0
                     elapsed_time = time.time() - self.start_time
                     
                     print(f"스텝: {self.num_timesteps:,} | "
                           f"에피소드: {len(self.episode_rewards)} | "
-                          f"최근 10 에피소드 평균 보상: {mean_reward:.2f} | "
+                          f"최근 10 에피소드 평균 보상: {mean_reward:.3f} | "
+                          f"평균 활용률: {mean_utilization:.1%} | "
+                          f"최대 활용률: {max_utilization:.1%} | "
                           f"경과 시간: {elapsed_time:.1f}초")
         
-        # 주기적 평가 및 플롯 업데이트
+        # 빈번한 그래프 업데이트
+        if self.num_timesteps - self.last_update_time >= self.update_freq:
+            self._update_stability_metrics()
+            self._quick_update_plots()
+            self.last_update_time = self.num_timesteps
+        
+        # 주기적 평가 및 전체 플롯 업데이트
         if self.num_timesteps - self.last_eval_time >= self.eval_freq:
             self._perform_evaluation()
             self._update_plots()
@@ -115,13 +148,99 @@ class RealTimeMonitorCallback(BaseCallback):
             
         return True
     
+    def _update_stability_metrics(self):
+        """안정성 지표 업데이트"""
+        try:
+            # 충분한 데이터가 있을 때만 계산
+            if len(self.episode_rewards) >= self.stability_window:
+                # 최근 윈도우의 데이터
+                recent_rewards = self.episode_rewards[-self.stability_window:]
+                recent_utilizations = self.utilization_rates[-self.stability_window:]
+                
+                # 보상 안정성 (표준편차)
+                reward_std = np.std(recent_rewards)
+                self.reward_stability.append(reward_std)
+                
+                # 활용률 안정성
+                utilization_std = np.std(recent_utilizations)
+                self.utilization_stability.append(utilization_std)
+                
+                # 학습 곡선 smoothness (연속된 값들의 차이의 평균)
+                if len(recent_rewards) > 1:
+                    reward_diffs = np.diff(recent_rewards)
+                    smoothness = 1.0 / (1.0 + np.mean(np.abs(reward_diffs)))  # 0~1 범위
+                    self.learning_smoothness.append(smoothness)
+                
+                # 최대 활용률 업데이트
+                current_max_util = np.max(self.utilization_rates)
+                self.max_utilization_rates.append(current_max_util)
+                
+        except Exception as e:
+            if self.verbose > 0:
+                print(f"안정성 지표 계산 중 오류: {e}")
+    
+    def _quick_update_plots(self):
+        """빠른 플롯 업데이트 (일부 차트만)"""
+        try:
+            # 메인 성능 지표만 빠르게 업데이트
+            if len(self.episode_rewards) > 10:
+                # 보상 차트 업데이트
+                self.axes[0, 0].clear()
+                episodes = list(range(1, len(self.episode_rewards) + 1))
+                self.axes[0, 0].plot(episodes, self.episode_rewards, 'b-', alpha=0.3, linewidth=0.8)
+                
+                # 이동평균
+                if len(self.episode_rewards) >= 20:
+                    window = min(50, len(self.episode_rewards) // 4)
+                    moving_avg = []
+                    for i in range(window-1, len(self.episode_rewards)):
+                        avg = np.mean(self.episode_rewards[i-window+1:i+1])
+                        moving_avg.append(avg)
+                    self.axes[0, 0].plot(episodes[window-1:], moving_avg, 'r-', linewidth=2, label=f'이동평균({window})')
+                    self.axes[0, 0].legend()
+                
+                self.axes[0, 0].set_title('에피소드별 보상 (실시간)')
+                self.axes[0, 0].set_xlabel('에피소드')
+                self.axes[0, 0].set_ylabel('보상')
+                self.axes[0, 0].grid(True, alpha=0.3)
+                
+                # 활용률 차트 업데이트
+                self.axes[0, 1].clear()
+                utilization_pct = [u * 100 for u in self.utilization_rates]
+                self.axes[0, 1].plot(episodes, utilization_pct, 'g-', alpha=0.4, linewidth=0.8)
+                
+                # 활용률 이동평균
+                if len(utilization_pct) >= 20:
+                    window = min(30, len(utilization_pct) // 4)
+                    moving_avg_util = []
+                    for i in range(window-1, len(utilization_pct)):
+                        avg = np.mean(utilization_pct[i-window+1:i+1])
+                        moving_avg_util.append(avg)
+                    self.axes[0, 1].plot(episodes[window-1:], moving_avg_util, 'darkgreen', linewidth=2, label=f'이동평균({window})')
+                    self.axes[0, 1].legend()
+                
+                self.axes[0, 1].set_title('컨테이너 활용률 (실시간)')
+                self.axes[0, 1].set_xlabel('에피소드')
+                self.axes[0, 1].set_ylabel('활용률 (%)')
+                self.axes[0, 1].set_ylim(0, 100)
+                self.axes[0, 1].grid(True, alpha=0.3)
+                
+                plt.tight_layout()
+                plt.draw()
+                plt.pause(0.001)  # 매우 짧은 pause
+                
+        except Exception as e:
+            if self.verbose > 0:
+                print(f"빠른 플롯 업데이트 중 오류: {e}")
+    
     def _perform_evaluation(self):
-        """모델 평가 수행"""
+        """모델 평가 수행 (활용률 포함)"""
         try:
             print(f"\n평가 수행 중... (스텝: {self.num_timesteps:,})")
             
             # 평가 실행
             eval_rewards = []
+            eval_utilizations = []
             success_count = 0
             
             for _ in range(self.n_eval_episodes):
@@ -141,53 +260,79 @@ class RealTimeMonitorCallback(BaseCallback):
                 
                 eval_rewards.append(episode_reward)
                 
+                # 활용률은 보상과 동일 (환경에서 활용률이 보상으로 사용됨)
+                episode_utilization = max(0.0, episode_reward)
+                eval_utilizations.append(episode_utilization)
+                
                 # 성공률 계산 (보상이 양수이면 성공으로 간주)
                 if episode_reward > 0:
                     success_count += 1
             
             mean_eval_reward = np.mean(eval_rewards)
+            mean_eval_utilization = np.mean(eval_utilizations)
             success_rate = success_count / self.n_eval_episodes
             
             # 결과 저장
             self.eval_rewards.append(mean_eval_reward)
+            self.eval_utilization_rates.append(mean_eval_utilization)
             self.eval_timesteps.append(self.num_timesteps)
             self.success_rates.append(success_rate)
             
-            print(f"평가 완료: 평균 보상 {mean_eval_reward:.2f}, 성공률 {success_rate:.1%}")
+            print(f"평가 완료: 평균 보상 {mean_eval_reward:.3f}, "
+                  f"평균 활용률 {mean_eval_utilization:.1%}, "
+                  f"성공률 {success_rate:.1%}")
             
         except Exception as e:
             print(f"평가 중 오류 발생: {e}")
+            if self.verbose > 1:
+                import traceback
+                traceback.print_exc()
     
     def _setup_plots(self):
-        """플롯 초기 설정"""
-        # 에피소드별 보상
+        """플롯 초기 설정 (3x2 그리드)"""
+        # 상단 왼쪽: 에피소드별 보상
         self.axes[0, 0].set_title('에피소드별 보상')
         self.axes[0, 0].set_xlabel('에피소드')
         self.axes[0, 0].set_ylabel('보상')
-        self.axes[0, 0].grid(True)
+        self.axes[0, 0].grid(True, alpha=0.3)
         
-        # 평가 보상
-        self.axes[0, 1].set_title('평가 보상 (이동 평균)')
-        self.axes[0, 1].set_xlabel('학습 스텝')
-        self.axes[0, 1].set_ylabel('평균 보상')
-        self.axes[0, 1].grid(True)
+        # 상단 오른쪽: 컨테이너 활용률
+        self.axes[0, 1].set_title('컨테이너 활용률')
+        self.axes[0, 1].set_xlabel('에피소드')
+        self.axes[0, 1].set_ylabel('활용률 (%)')
+        self.axes[0, 1].set_ylim(0, 100)
+        self.axes[0, 1].grid(True, alpha=0.3)
         
-        # 성공률
-        self.axes[1, 0].set_title('성공률')
+        # 중단 왼쪽: 평가 성능 (보상 & 활용률)
+        self.axes[1, 0].set_title('평가 성능')
         self.axes[1, 0].set_xlabel('학습 스텝')
-        self.axes[1, 0].set_ylabel('성공률 (%)')
-        self.axes[1, 0].grid(True)
+        self.axes[1, 0].set_ylabel('평균 보상/활용률')
+        self.axes[1, 0].grid(True, alpha=0.3)
         
-        # 에피소드 길이
-        self.axes[1, 1].set_title('평균 에피소드 길이')
-        self.axes[1, 1].set_xlabel('에피소드')
-        self.axes[1, 1].set_ylabel('스텝 수')
-        self.axes[1, 1].grid(True)
+        # 중단 오른쪽: 성공률
+        self.axes[1, 1].set_title('성공률')
+        self.axes[1, 1].set_xlabel('학습 스텝')
+        self.axes[1, 1].set_ylabel('성공률 (%)')
+        self.axes[1, 1].set_ylim(0, 100)
+        self.axes[1, 1].grid(True, alpha=0.3)
+        
+        # 하단 왼쪽: 학습 안정성 지표
+        self.axes[2, 0].set_title('학습 안정성')
+        self.axes[2, 0].set_xlabel('학습 진행도')
+        self.axes[2, 0].set_ylabel('안정성 지표')
+        self.axes[2, 0].grid(True, alpha=0.3)
+        
+        # 하단 오른쪽: 에피소드 길이 & 최대 활용률
+        self.axes[2, 1].set_title('에피소드 길이 & 최대 활용률')
+        self.axes[2, 1].set_xlabel('에피소드')
+        self.axes[2, 1].set_ylabel('길이 / 최대 활용률')
+        self.axes[2, 1].grid(True, alpha=0.3)
         
         plt.tight_layout()
+        plt.subplots_adjust(hspace=0.3, wspace=0.3)  # 서브플롯 간격 조정
     
     def _update_plots(self):
-        """플롯 업데이트"""
+        """플롯 업데이트 (전체 6개 차트)"""
         try:
             # 모든 서브플롯 클리어
             for ax in self.axes.flat:
@@ -196,7 +341,7 @@ class RealTimeMonitorCallback(BaseCallback):
             # 플롯 재설정
             self._setup_plots()
             
-            # 1. 에피소드별 보상
+            # 1. 에피소드별 보상 (상단 왼쪽)
             if self.episode_rewards:
                 episodes = list(range(1, len(self.episode_rewards) + 1))
                 self.axes[0, 0].plot(episodes, self.episode_rewards, 'b-', alpha=0.3, linewidth=0.5)
@@ -210,42 +355,112 @@ class RealTimeMonitorCallback(BaseCallback):
                     self.axes[0, 0].plot(episodes[49:], moving_avg, 'r-', linewidth=2, label='이동평균(50)')
                     self.axes[0, 0].legend()
             
-            # 2. 평가 보상
-            if self.eval_rewards:
-                self.axes[0, 1].plot(self.eval_timesteps, self.eval_rewards, 'g-o', linewidth=2, markersize=4)
-                self.axes[0, 1].axhline(y=0, color='k', linestyle='--', alpha=0.5)
+            # 2. 컨테이너 활용률 (상단 오른쪽)
+            if self.utilization_rates:
+                episodes = list(range(1, len(self.utilization_rates) + 1))
+                utilization_pct = [u * 100 for u in self.utilization_rates]
+                self.axes[0, 1].plot(episodes, utilization_pct, 'g-', alpha=0.4, linewidth=0.6)
+                
+                # 활용률 이동평균
+                if len(utilization_pct) >= 30:
+                    window = min(30, len(utilization_pct) // 4)
+                    moving_avg_util = []
+                    for i in range(window-1, len(utilization_pct)):
+                        avg = np.mean(utilization_pct[i-window+1:i+1])
+                        moving_avg_util.append(avg)
+                    self.axes[0, 1].plot(episodes[window-1:], moving_avg_util, 'darkgreen', linewidth=2, label=f'이동평균({window})')
+                    self.axes[0, 1].legend()
+                
+                # 목표선 추가
+                self.axes[0, 1].axhline(y=80, color='orange', linestyle='--', alpha=0.7, label='목표(80%)')
+                if not any('목표' in str(h.get_label()) for h in self.axes[0, 1].get_children() if hasattr(h, 'get_label')):
+                    self.axes[0, 1].legend()
             
-            # 3. 성공률
+            # 3. 평가 성능 (중단 왼쪽)
+            if self.eval_rewards:
+                # 평가 보상
+                self.axes[1, 0].plot(self.eval_timesteps, self.eval_rewards, 'g-o', linewidth=2, markersize=4, label='평가 보상')
+                self.axes[1, 0].axhline(y=0, color='k', linestyle='--', alpha=0.5)
+                
+                # 평가 활용률 (있는 경우)
+                if self.eval_utilization_rates:
+                    eval_util_pct = [u * 100 for u in self.eval_utilization_rates]
+                    ax2 = self.axes[1, 0].twinx()
+                    ax2.plot(self.eval_timesteps, eval_util_pct, 'purple', marker='s', linewidth=2, markersize=3, label='평가 활용률(%)')
+                    ax2.set_ylabel('활용률 (%)', color='purple')
+                    ax2.set_ylim(0, 100)
+                
+                self.axes[1, 0].legend(loc='upper left')
+            
+            # 4. 성공률 (중단 오른쪽)
             if self.success_rates:
                 success_percentages = [rate * 100 for rate in self.success_rates]
-                self.axes[1, 0].plot(self.eval_timesteps, success_percentages, 'orange', linewidth=2, marker='s', markersize=4)
-                self.axes[1, 0].set_ylim(0, 100)
+                self.axes[1, 1].plot(self.eval_timesteps, success_percentages, 'orange', linewidth=2, marker='s', markersize=4)
+                self.axes[1, 1].axhline(y=80, color='red', linestyle='--', alpha=0.7, label='목표(80%)')
+                self.axes[1, 1].legend()
             
-            # 4. 에피소드 길이
+            # 5. 학습 안정성 지표 (하단 왼쪽)
+            if len(self.reward_stability) > 0:
+                stability_x = list(range(len(self.reward_stability)))
+                
+                # 보상 안정성 (표준편차)
+                self.axes[2, 0].plot(stability_x, self.reward_stability, 'red', linewidth=2, label='보상 안정성', alpha=0.7)
+                
+                # 활용률 안정성
+                if len(self.utilization_stability) > 0:
+                    self.axes[2, 0].plot(stability_x, self.utilization_stability, 'blue', linewidth=2, label='활용률 안정성', alpha=0.7)
+                
+                # 학습 smoothness
+                if len(self.learning_smoothness) > 0:
+                    # 0~1 범위를 표준편차 범위에 맞게 스케일링
+                    max_std = max(max(self.reward_stability), max(self.utilization_stability) if self.utilization_stability else 0)
+                    scaled_smoothness = [s * max_std for s in self.learning_smoothness]
+                    self.axes[2, 0].plot(stability_x, scaled_smoothness, 'green', linewidth=2, label='학습 smoothness', alpha=0.7)
+                
+                self.axes[2, 0].legend()
+            
+            # 6. 에피소드 길이 & 최대 활용률 (하단 오른쪽)
             if self.episode_lengths:
                 episodes = list(range(1, len(self.episode_lengths) + 1))
-                self.axes[1, 1].plot(episodes, self.episode_lengths, 'purple', alpha=0.6, linewidth=0.5)
                 
-                # 이동 평균
+                # 에피소드 길이
+                self.axes[2, 1].plot(episodes, self.episode_lengths, 'purple', alpha=0.4, linewidth=0.5, label='에피소드 길이')
+                
+                # 에피소드 길이 이동평균
                 if len(self.episode_lengths) >= 20:
+                    window = min(20, len(self.episode_lengths) // 4)
                     moving_avg_lengths = []
-                    for i in range(19, len(self.episode_lengths)):
-                        avg = np.mean(self.episode_lengths[i-19:i+1])
+                    for i in range(window-1, len(self.episode_lengths)):
+                        avg = np.mean(self.episode_lengths[i-window+1:i+1])
                         moving_avg_lengths.append(avg)
-                    self.axes[1, 1].plot(episodes[19:], moving_avg_lengths, 'darkred', linewidth=2, label='이동평균(20)')
-                    self.axes[1, 1].legend()
+                    self.axes[2, 1].plot(episodes[window-1:], moving_avg_lengths, 'darkred', linewidth=2, label=f'길이 이동평균({window})')
+                
+                # 최대 활용률 (있는 경우)
+                if len(self.max_utilization_rates) > 0:
+                    # 두 번째 y축 사용
+                    ax3 = self.axes[2, 1].twinx()
+                    max_util_pct = [u * 100 for u in self.max_utilization_rates[-len(episodes):]]  # 에피소드 수에 맞춤
+                    ax3.plot(episodes[-len(max_util_pct):], max_util_pct, 'orange', linewidth=2, marker='*', markersize=3, label='최대 활용률(%)')
+                    ax3.set_ylabel('최대 활용률 (%)', color='orange')
+                    ax3.set_ylim(0, 100)
+                
+                self.axes[2, 1].legend(loc='upper left')
             
             # 플롯 업데이트
             plt.tight_layout()
+            plt.subplots_adjust(hspace=0.3, wspace=0.3)
             plt.draw()
             plt.pause(0.01)
             
             # 플롯 저장
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            self.fig.savefig(f'results/training_progress_{timestamp}.png', dpi=150, bbox_inches='tight')
+            self.fig.savefig(f'results/comprehensive_training_progress_{timestamp}.png', dpi=150, bbox_inches='tight')
             
         except Exception as e:
             print(f"플롯 업데이트 중 오류: {e}")
+            if self.verbose > 1:
+                import traceback
+                traceback.print_exc()
     
     def _on_training_end(self) -> None:
         """학습 종료 시 호출"""
@@ -263,23 +478,101 @@ class RealTimeMonitorCallback(BaseCallback):
         plt.close(self.fig)
     
     def _save_training_stats(self, timestamp):
-        """학습 통계 저장"""
+        """학습 통계 저장 (활용률 및 안정성 지표 포함)"""
         stats = {
+            # 기본 통계
             'total_episodes': len(self.episode_rewards),
             'total_timesteps': self.num_timesteps,
             'final_eval_reward': self.eval_rewards[-1] if self.eval_rewards else 0,
             'final_success_rate': self.success_rates[-1] if self.success_rates else 0,
             'best_eval_reward': max(self.eval_rewards) if self.eval_rewards else 0,
             'best_success_rate': max(self.success_rates) if self.success_rates else 0,
+            
+            # 활용률 통계
+            'final_utilization_rate': self.utilization_rates[-1] if self.utilization_rates else 0,
+            'best_utilization_rate': max(self.utilization_rates) if self.utilization_rates else 0,
+            'average_utilization_rate': np.mean(self.utilization_rates) if self.utilization_rates else 0,
+            'final_eval_utilization': self.eval_utilization_rates[-1] if self.eval_utilization_rates else 0,
+            'best_eval_utilization': max(self.eval_utilization_rates) if self.eval_utilization_rates else 0,
+            
+            # 안정성 통계
+            'final_reward_stability': self.reward_stability[-1] if self.reward_stability else 0,
+            'final_utilization_stability': self.utilization_stability[-1] if self.utilization_stability else 0,
+            'final_learning_smoothness': self.learning_smoothness[-1] if self.learning_smoothness else 0,
+            'average_reward_stability': np.mean(self.reward_stability) if self.reward_stability else 0,
+            'average_utilization_stability': np.mean(self.utilization_stability) if self.utilization_stability else 0,
+            'average_learning_smoothness': np.mean(self.learning_smoothness) if self.learning_smoothness else 0,
+            
+            # 원시 데이터 (분석용)
             'episode_rewards': self.episode_rewards,
+            'utilization_rates': self.utilization_rates,
             'eval_rewards': self.eval_rewards,
+            'eval_utilization_rates': self.eval_utilization_rates,
             'eval_timesteps': self.eval_timesteps,
             'success_rates': self.success_rates,
+            'episode_lengths': self.episode_lengths,
+            'reward_stability': self.reward_stability,
+            'utilization_stability': self.utilization_stability,
+            'learning_smoothness': self.learning_smoothness,
+            'max_utilization_rates': self.max_utilization_rates,
         }
         
         # 통계를 numpy 파일로 저장
-        np.save(f'results/training_stats_{timestamp}.npy', stats)
-        print(f"학습 통계 저장 완료: training_stats_{timestamp}.npy")
+        np.save(f'results/comprehensive_training_stats_{timestamp}.npy', stats)
+        print(f"종합 학습 통계 저장 완료: comprehensive_training_stats_{timestamp}.npy")
+        
+        # 요약 텍스트 파일도 저장
+        summary_path = f'results/comprehensive_summary_{timestamp}.txt'
+        with open(summary_path, 'w', encoding='utf-8') as f:
+            f.write("=== 종합 학습 성과 요약 ===\n\n")
+            
+            f.write("📈 기본 성과 지표:\n")
+            f.write(f"  • 총 에피소드: {stats['total_episodes']:,}\n")
+            f.write(f"  • 총 학습 스텝: {stats['total_timesteps']:,}\n")
+            f.write(f"  • 최종 평가 보상: {stats['final_eval_reward']:.3f}\n")
+            f.write(f"  • 최고 평가 보상: {stats['best_eval_reward']:.3f}\n")
+            f.write(f"  • 최종 성공률: {stats['final_success_rate']:.1%}\n")
+            f.write(f"  • 최고 성공률: {stats['best_success_rate']:.1%}\n\n")
+            
+            f.write("🎯 활용률 성과:\n")
+            f.write(f"  • 최종 활용률: {stats['final_utilization_rate']:.1%}\n")
+            f.write(f"  • 최고 활용률: {stats['best_utilization_rate']:.1%}\n")
+            f.write(f"  • 평균 활용률: {stats['average_utilization_rate']:.1%}\n")
+            f.write(f"  • 최종 평가 활용률: {stats['final_eval_utilization']:.1%}\n")
+            f.write(f"  • 최고 평가 활용률: {stats['best_eval_utilization']:.1%}\n\n")
+            
+            f.write("⚖️ 학습 안정성:\n")
+            f.write(f"  • 최종 보상 안정성: {stats['final_reward_stability']:.3f}\n")
+            f.write(f"  • 최종 활용률 안정성: {stats['final_utilization_stability']:.3f}\n")
+            f.write(f"  • 최종 학습 smoothness: {stats['final_learning_smoothness']:.3f}\n")
+            f.write(f"  • 평균 보상 안정성: {stats['average_reward_stability']:.3f}\n")
+            f.write(f"  • 평균 활용률 안정성: {stats['average_utilization_stability']:.3f}\n")
+            f.write(f"  • 평균 학습 smoothness: {stats['average_learning_smoothness']:.3f}\n\n")
+            
+            # 성과 등급 평가
+            f.write("🏆 성과 등급:\n")
+            if stats['best_utilization_rate'] >= 0.8:
+                f.write("  • 활용률: 🥇 우수 (80% 이상)\n")
+            elif stats['best_utilization_rate'] >= 0.6:
+                f.write("  • 활용률: 🥈 양호 (60-80%)\n")
+            else:
+                f.write("  • 활용률: 🥉 개선 필요 (60% 미만)\n")
+                
+            if stats['best_success_rate'] >= 0.8:
+                f.write("  • 성공률: 🥇 우수 (80% 이상)\n")
+            elif stats['best_success_rate'] >= 0.5:
+                f.write("  • 성공률: 🥈 양호 (50-80%)\n")
+            else:
+                f.write("  • 성공률: 🥉 개선 필요 (50% 미만)\n")
+                
+            if stats['average_learning_smoothness'] >= 0.7:
+                f.write("  • 학습 안정성: 🥇 매우 안정적\n")
+            elif stats['average_learning_smoothness'] >= 0.5:
+                f.write("  • 학습 안정성: 🥈 안정적\n")
+            else:
+                f.write("  • 학습 안정성: 🥉 불안정\n")
+        
+        print(f"학습 성과 요약 저장 완료: {summary_path}")
 
 
 def create_live_dashboard(stats_file):
@@ -535,7 +828,8 @@ def train_and_evaluate(
         eval_env=eval_env,
         eval_freq=max(eval_freq // 2, 2000),  # 평가 주기를 더 짧게 설정
         n_eval_episodes=5,
-        verbose=1
+        verbose=1,
+        update_freq=max(eval_freq // 10, 1000)  # 빠른 그래프 업데이트 주기
     )
     callbacks.append(monitor_callback)
     
