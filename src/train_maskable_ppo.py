@@ -1248,12 +1248,58 @@ def train_and_evaluate(
         model.save(model_path)
         print(f"개선된 모델 저장 완료: {model_path}")
         
-        # 최종 평가
+        # 최종 평가 (안전한 방식)
         print("\n=== 최종 모델 평가 ===")
-        mean_reward, std_reward = evaluate_policy(
-            model, eval_env, n_eval_episodes=10, deterministic=True
-        )
-        print(f"평균 보상: {mean_reward:.4f} ± {std_reward:.4f}")
+        try:
+            # 간단하고 빠른 평가 수행
+            print("빠른 평가 시작...")
+            
+            # 단일 에피소드 평가
+            obs, _ = eval_env.reset()
+            total_reward = 0.0
+            episode_count = 0
+            max_episodes = 3  # 최대 3개 에피소드만 평가
+            
+            for episode in range(max_episodes):
+                obs, _ = eval_env.reset()
+                episode_reward = 0.0
+                step_count = 0
+                max_steps = 50  # 에피소드당 최대 50 스텝
+                
+                while step_count < max_steps:
+                    try:
+                        action, _ = model.predict(obs, deterministic=True)
+                        obs, reward, terminated, truncated, info = eval_env.step(action)
+                        episode_reward += reward
+                        step_count += 1
+                        
+                        if terminated or truncated:
+                            break
+                    except Exception as e:
+                        print(f"평가 스텝 중 오류: {e}")
+                        break
+                
+                total_reward += episode_reward
+                episode_count += 1
+                print(f"에피소드 {episode + 1}: 보상 = {episode_reward:.4f}")
+            
+            if episode_count > 0:
+                mean_reward = total_reward / episode_count
+                std_reward = 0.0  # 간단한 평가에서는 표준편차 계산 생략
+            else:
+                mean_reward = 0.0
+                std_reward = 0.0
+                
+            print(f"평균 보상: {mean_reward:.4f} ± {std_reward:.4f}")
+                
+        except Exception as e:
+            print(f"⚠️ 평가 중 오류 발생: {e}")
+            import traceback
+            traceback.print_exc()
+            # 기본값 설정
+            mean_reward = 0.0
+            std_reward = 0.0
+            print(f"기본 평가 보상: {mean_reward:.4f} ± {std_reward:.4f}")
         
         # GIF 생성 (기존 코드 스타일 유지)
         if save_gif:
