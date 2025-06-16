@@ -120,6 +120,9 @@ mkdir -p models results logs gifs
 echo "=== 개선된 Maskable PPO 3D Bin Packing 학습 시작: $(date '+%Y-%m-%d %H:%M:%S') ==="
 
 # 개선된 학습 실행 (더 긴 학습 시간과 개선된 하이퍼파라미터)
+# PYTHONPATH 설정으로 환경 등록 문제 해결
+export PYTHONPATH="${PWD}:${PYTHONPATH}"
+
 if python -m src.train_maskable_ppo \
     --timesteps 200000 \
     --eval-freq 15000 \

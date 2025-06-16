@@ -34,6 +34,22 @@ from stable_baselines3.common.results_plotter import load_results, ts2xy
 from src.utils import boxes_generator
 from src.device_utils import setup_training_device, log_system_info, get_device
 
+# 환경 등록 (KAMP 서버에서 패키지 설치 없이 사용하기 위해)
+try:
+    import gymnasium as gym
+    from gymnasium.envs.registration import register
+    from src.packing_env import PackingEnv
+    
+    # PackingEnv-v0 환경 등록
+    if 'PackingEnv-v0' not in gym.envs.registry:
+        register(id='PackingEnv-v0', entry_point='src.packing_env:PackingEnv')
+        print("✅ PackingEnv-v0 환경 등록 완료")
+    else:
+        print("✅ PackingEnv-v0 환경 이미 등록됨")
+except Exception as e:
+    print(f"⚠️ 환경 등록 중 오류: {e}")
+    print("환경을 수동으로 등록해야 할 수 있습니다.")
+
 from plotly_gif import GIF
 import io
 from PIL import Image
@@ -734,59 +750,67 @@ def make_env(
     """
     def _init():
         try:
-            # 기본 환경 생성 (여러 환경 ID 시도)
-            env_ids = [
-                "rl_3d_bin_packing:BinPacking-v1",
-                "BinPacking-v1", 
-                "PackingEnv-v0"
-            ]
+            # PackingEnv 환경에 맞는 박스 크기 생성
+            from src.utils import boxes_generator
             
-            env = None
-            for env_id in env_ids:
-                try:
-                    env = gym.make(
-                        env_id,
-                        container_size=container_size,
-                        max_num_boxes=num_boxes,
-                        num_visible_boxes=num_visible_boxes,
-                        max_num_boxes_to_pack=num_boxes,
-                        render_mode=render_mode,
-                        random_boxes=random_boxes,
-                        only_terminal_reward=only_terminal_reward,
-                    )
-                    print(f"환경 생성 성공: {env_id}")
-                    break
-                except Exception as e:
-                    print(f"환경 {env_id} 생성 실패: {e}")
-                    continue
+            # 박스 크기 생성 (num_boxes 개수만큼)
+            box_sizes = boxes_generator(
+                bin_size=container_size,
+                num_items=num_boxes,
+                seed=seed
+            )
             
-            if env is None:
-                raise RuntimeError("모든 환경 ID에서 환경 생성에 실패했습니다.")
+            print(f"생성된 박스 개수: {len(box_sizes)}")
+            print(f"컨테이너 크기: {container_size}")
+            
+            # PackingEnv-v0 환경 생성
+            env = gym.make(
+                "PackingEnv-v0",
+                container_size=container_size,
+                box_sizes=box_sizes,
+                num_visible_boxes=num_visible_boxes,
+                render_mode=render_mode,
+                random_boxes=random_boxes,
+                only_terminal_reward=only_terminal_reward,
+            )
+            
+            print(f"환경 생성 성공: PackingEnv-v0")
             
             # 개선된 보상 쉐이핑 적용
             if improved_reward_shaping:
                 env = ImprovedRewardWrapper(env)
+                print("개선된 보상 래퍼 적용됨")
             
             # 액션 마스킹 래퍼 적용
             def mask_fn(env_instance):
                 try:
-                    return get_action_masks(env_instance)
+                    # PackingEnv의 action_masks 메서드 사용
+                    if hasattr(env_instance, 'action_masks'):
+                        masks = env_instance.action_masks()
+                        return np.array(masks, dtype=bool)
+                    else:
+                        # 기본 마스크 반환 (모든 액션 허용)
+                        return np.ones(env_instance.action_space.n, dtype=bool)
                 except Exception as e:
                     print(f"액션 마스크 생성 실패: {e}")
                     # 기본 마스크 반환 (모든 액션 허용)
                     return np.ones(env_instance.action_space.n, dtype=bool)
             
             env = ActionMasker(env, mask_fn)
+            print("액션 마스킹 래퍼 적용됨")
             
             # 시드 설정
             try:
-                env.reset(seed=seed)
+                if hasattr(env, 'seed'):
+                    env.seed(seed)
+                obs, info = env.reset(seed=seed)
                 env.action_space.seed(seed)
                 env.observation_space.seed(seed)
+                print(f"시드 설정 완료: {seed}")
             except Exception as e:
                 print(f"시드 설정 실패: {e}")
                 # 시드 없이 리셋 시도
-                env.reset()
+                obs, info = env.reset()
             
             return env
             
