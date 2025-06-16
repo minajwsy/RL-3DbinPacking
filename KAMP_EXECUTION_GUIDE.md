@@ -216,10 +216,6 @@ python -m src.train_maskable_ppo --eval-freq 25000 --timesteps 100000
 - **문제**: `num_boxes`, `container_size` 파라미터 불일치
 - **해결**: `num_items`, `bin_size` 파라미터로 수정
 
-### 6. 커리큘럼 학습 환경 업데이트 오류
-- **문제**: `Expected env to be a gymnasium.Env but got <class 'function'>`
-- **해결**: 동적 환경 업데이트 대신 상태 추적 방식으로 변경, 안정성 향상
-
 ---
 
 이 가이드를 따라 실행하면 개선된 학습 성능을 확인할 수 있습니다! 

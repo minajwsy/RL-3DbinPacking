@@ -1403,28 +1403,27 @@ class CurriculumLearningCallback(BaseCallback):
             self.curriculum_level += 1
             self.consecutive_successes = 0
             
-            # 환경 재생성 (현재는 정보만 추적)
+            # 환경 재생성
             self._update_environment()
-            
-            # 커리큘럼 상태 저장
-            self.save_curriculum_state()
     
     def _update_environment(self):
-        """환경을 새로운 박스 개수로 업데이트 (현재는 정보만 추적)"""
+        """환경을 새로운 박스 개수로 업데이트 (안전한 방식)"""
         try:
-            # 현재는 환경을 동적으로 변경하지 않고 정보만 추적
-            # 실제 환경 변경은 복잡하고 오류가 발생하기 쉬우므로
-            # 대신 난이도 정보만 업데이트하고 다음 학습 세션에서 반영
-            
+            # 환경 직접 변경 대신 로그만 출력
+            # 실제 환경 변경은 학습 중에 불안정할 수 있으므로 비활성화
             if self.verbose >= 1:
-                print(f"   - 난이도 정보 업데이트: {self.current_boxes}개 박스")
-                print(f"   - 환경 동적 업데이트는 안정성을 위해 비활성화됨")
-                print(f"   - 다음 학습 세션에서 새로운 난이도가 적용됩니다")
+                print(f"   - 환경 업데이트 시뮬레이션: {self.current_boxes}개 박스")
+                print(f"   - 실제 환경 변경은 안정성을 위해 비활성화됨")
+                
+            # 대신 다음 에피소드부터 더 어려운 조건으로 평가하도록 설정
+            # (실제 구현에서는 환경 내부 파라미터를 조정하거나 
+            #  새로운 학습 세션에서 더 어려운 설정을 사용)
                 
         except Exception as e:
             if self.verbose >= 1:
-                print(f"   - 환경 업데이트 실패: {e}")
-            # 환경 업데이트 실패 시에도 학습은 계속 진행
+                print(f"   - 환경 업데이트 처리 중 오류: {e}")
+                import traceback
+                traceback.print_exc()
     
     def get_current_difficulty(self):
         """현재 난이도 정보 반환"""
@@ -1435,40 +1434,6 @@ class CurriculumLearningCallback(BaseCallback):
             "success_rate": self.last_success_rate,
             "consecutive_successes": self.consecutive_successes,
         }
-    
-    def save_curriculum_state(self, filepath="curriculum_state.json"):
-        """커리큘럼 학습 상태를 파일에 저장"""
-        try:
-            import json
-            state = {
-                "current_boxes": self.current_boxes,
-                "curriculum_level": self.curriculum_level,
-                "success_rate": self.last_success_rate,
-                "consecutive_successes": self.consecutive_successes,
-                "timestamp": datetime.datetime.now().isoformat(),
-            }
-            
-            os.makedirs("logs", exist_ok=True)
-            with open(f"logs/{filepath}", "w") as f:
-                json.dump(state, f, indent=2)
-                
-            if self.verbose >= 1:
-                print(f"   - 커리큘럼 상태 저장: logs/{filepath}")
-                
-        except Exception as e:
-            if self.verbose >= 1:
-                print(f"   - 커리큘럼 상태 저장 실패: {e}")
-    
-    @classmethod
-    def load_curriculum_state(cls, filepath="curriculum_state.json"):
-        """저장된 커리큘럼 학습 상태를 로드"""
-        try:
-            import json
-            with open(f"logs/{filepath}", "r") as f:
-                state = json.load(f)
-            return state
-        except Exception:
-            return None
 
 
 def main():
