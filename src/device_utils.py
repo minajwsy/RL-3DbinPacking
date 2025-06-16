@@ -59,46 +59,58 @@ def get_device(force_cpu: bool = False) -> torch.device:
 
 def setup_training_device(verbose: bool = True) -> dict:
     """
-    학습을 위한 디바이스 설정을 반환합니다.
+    학습 디바이스 설정 및 최적화된 하이퍼파라미터 반환 (개선된 버전)
     
-    Args:
-        verbose (bool): 상세 정보 출력 여부
-        
     Returns:
-        dict: 학습 설정 정보
+        dict: 디바이스별 최적화된 하이퍼파라미터
     """
     device = get_device()
-    gpu_available, device_info = check_gpu_availability()
     
-    # GPU가 있을 경우 최적화된 설정
-    if gpu_available:
+    if device.type == "cuda":
+        # GPU 사용 시 더 적극적인 하이퍼파라미터
         config = {
-            "device": device,
+            "learning_rate": 5e-4,  # 더 높은 학습률
             "n_steps": 2048,
-            "batch_size": 64,
-            "learning_rate": 3e-4,
-            "n_epochs": 10,
-            "use_mixed_precision": True,
-            "pin_memory": True,
+            "batch_size": 512,      # 더 큰 배치 크기
+            "n_epochs": 15,         # 더 많은 에포크
+            "gamma": 0.995,         # 높은 감가율
+            "gae_lambda": 0.95,
+            "clip_range": 0.2,
+            "ent_coef": 0.02,       # 더 높은 엔트로피 계수 (탐험 장려)
+            "vf_coef": 0.5,
+            "max_grad_norm": 0.5,
+            "device": device
         }
+        if verbose:
+            print(f"🚀 GPU 최적화 모드 활성화: {torch.cuda.get_device_name()}")
+            try:
+                print(f"CUDA 메모리: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f}GB")
+            except:
+                print("CUDA 메모리 정보를 가져올 수 없습니다")
+            print("높은 성능 하이퍼파라미터 적용")
     else:
-        # CPU에서는 더 작은 배치 크기 사용
+        # CPU 사용 시에도 개선된 하이퍼파라미터
         config = {
-            "device": device,
-            "n_steps": 512,
-            "batch_size": 16,
-            "learning_rate": 1e-4,
-            "n_epochs": 4,
-            "use_mixed_precision": False,
-            "pin_memory": False,
+            "learning_rate": 3e-4,  # CPU에서도 더 높은 학습률
+            "n_steps": 1024,
+            "batch_size": 256,      # 더 큰 배치 크기
+            "n_epochs": 10,         # 더 많은 에포크
+            "gamma": 0.99,
+            "gae_lambda": 0.95,
+            "clip_range": 0.2,
+            "ent_coef": 0.01,
+            "vf_coef": 0.5,
+            "max_grad_norm": 0.5,
+            "device": device
         }
+        if verbose:
+            print("🖥️  CPU 최적화 모드 (개선된 하이퍼파라미터)")
     
     if verbose:
-        print(f"학습 설정:")
-        print(f"  - 디바이스: {device}")
-        print(f"  - 배치 크기: {config['batch_size']}")
-        print(f"  - 학습률: {config['learning_rate']}")
-        print(f"  - 스텝 수: {config['n_steps']}")
+        print(f"📊 개선된 하이퍼파라미터:")
+        for key, value in config.items():
+            if key != 'device':
+                print(f"   - {key}: {value}")
     
     return config
 

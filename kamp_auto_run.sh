@@ -117,13 +117,34 @@ export PYTHONPATH="${PWD}/src:${PYTHONPATH}"
 mkdir -p models results logs gifs
 
 # Maskable PPO 실험 실행
-echo "=== Maskable PPO 3D Bin Packing 학습 시작: $(date '+%Y-%m-%d %H:%M:%S') ==="
+echo "=== 개선된 Maskable PPO 3D Bin Packing 학습 시작: $(date '+%Y-%m-%d %H:%M:%S') ==="
 
-# 학습 실행 (기존 auto_run.sh의 실행 패턴 유지)
-if python -m src.train_maskable_ppo --timesteps 100000 2>&1 | tee results/training_output_${TIMESTAMP}.txt; then
-    echo "Maskable PPO 학습이 성공적으로 완료되었습니다."
+# 개선된 학습 실행 (더 긴 학습 시간과 개선된 하이퍼파라미터)
+if python -m src.train_maskable_ppo \
+    --timesteps 200000 \
+    --eval-freq 15000 \
+    --container-size 10 10 10 \
+    --num-boxes 32 \
+    --curriculum-learning \
+    --improved-rewards \
+    2>&1 | tee results/improved_training_output_${TIMESTAMP}.txt; then
+    echo "개선된 Maskable PPO 학습이 성공적으로 완료되었습니다."
+    
+    # 학습 성과 요약 출력
+    echo "=== 학습 결과 요약 ==="
+    if ls results/comprehensive_summary_*.txt >/dev/null 2>&1; then
+        echo "📊 최신 학습 요약:"
+        tail -20 $(ls -t results/comprehensive_summary_*.txt | head -1)
+    fi
+    
+    # 실시간 모니터링 차트 확인
+    if ls results/improved_final_dashboard_*.png >/dev/null 2>&1; then
+        echo "📈 최종 성과 대시보드 생성됨:"
+        ls -la results/improved_final_dashboard_*.png | tail -1
+    fi
+    
 else
-    echo "학습 실행 중 오류가 발생했습니다. 오류 로그를 확인하세요."
+    echo "❌ 학습 실행 중 오류가 발생했습니다. 오류 로그를 확인하세요."
     # 오류가 있더라도 계속 진행 (기존 로직 유지)
 fi
 
@@ -160,13 +181,13 @@ git status
 echo "=== 결과 파일 추가 중 ==="
 
 # 학습 결과 파일 추가
-if [ -f "results/training_output_${TIMESTAMP}.txt" ]; then
-    git add "results/training_output_${TIMESTAMP}.txt"
+if [ -f "results/improved_training_output_${TIMESTAMP}.txt" ]; then
+    git add "results/improved_training_output_${TIMESTAMP}.txt"
     echo "학습 결과 파일이 추가되었습니다."
 fi
 
 # 학습 결과 요약 파일 추가
-RESULTS_FILES=$(find "results" -name "training_results_*.txt" 2>/dev/null)
+RESULTS_FILES=$(find "results" -name "comprehensive_summary_*.txt" 2>/dev/null)
 if [ -n "$RESULTS_FILES" ]; then
     git add $RESULTS_FILES
     echo "학습 결과 요약 파일이 추가되었습니다."
@@ -179,7 +200,7 @@ if [ -f "results/evaluation_${TIMESTAMP}.txt" ]; then
 fi
 
 # 모델 파일 추가 (용량이 클 수 있으므로 선택적)
-MODEL_FILES=$(find "models" -name "ppo_mask_*.zip" -newer "results/training_output_${TIMESTAMP}.txt" 2>/dev/null || true)
+MODEL_FILES=$(find "models" -name "ppo_mask_*.zip" -newer "results/improved_training_output_${TIMESTAMP}.txt" 2>/dev/null || true)
 if [ -n "$MODEL_FILES" ]; then
     echo "새로운 모델 파일 발견, 추가 여부 확인 중..."
     # 파일 크기 확인 (100MB 이하만 추가)
@@ -203,7 +224,7 @@ if [ -n "$PNG_FILES" ]; then
     echo "PNG 파일이 추가되었습니다."
 fi
 
-GIF_FILES=$(find "gifs" -name "*.gif" -newer "results/training_output_${TIMESTAMP}.txt" 2>/dev/null || true)
+GIF_FILES=$(find "gifs" -name "*.gif" -newer "results/improved_training_output_${TIMESTAMP}.txt" 2>/dev/null || true)
 if [ -n "$GIF_FILES" ]; then
     git add $GIF_FILES
     echo "GIF 파일이 추가되었습니다."
