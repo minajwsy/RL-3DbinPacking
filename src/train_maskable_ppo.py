@@ -949,54 +949,132 @@ class ImprovedRewardWrapper(gym.Wrapper):
 
 def create_demonstration_gif(model, env, timestamp):
     """
-    학습된 모델의 시연 GIF 생성 (기존 코드 스타일 유지)
+    학습된 모델의 시연 GIF 생성 (개선된 버전)
     """
     try:
-        # Gymnasium API: env.reset()는 (obs, info) 튜플을 반환
+        print("=== GIF 시연 시작 ===")
+        
+        # 환경 리셋
         obs, info = env.reset()
-        done = False
-        truncated = False
+        
+        # 초기 상태 렌더링
+        initial_fig = env.render()
         figs = []
-        step_count = 0
-        max_steps = 100  # 무한 루프 방지
         
-        print("시연 시작...")
-        
-        while not (done or truncated) and step_count < max_steps:
-            # 액션 마스크 가져오기
-            action_masks = get_action_masks(env)
-            action, _states = model.predict(obs, action_masks=action_masks, deterministic=True)
-            # Gymnasium API: env.step()는 (obs, reward, terminated, truncated, info)를 반환
-            obs, rewards, done, truncated, info = env.step(action)
-            
-            # 렌더링
-            fig = env.render()
-            if fig is not None:
-                fig_png = fig.to_image(format="png")
+        if initial_fig is not None:
+            try:
+                fig_png = initial_fig.to_image(format="png")
                 buf = io.BytesIO(fig_png)
                 img = Image.open(buf)
                 figs.append(img)
-            
-            step_count += 1
+                print("초기 상태 캡처 완료")
+            except Exception as e:
+                print(f"초기 상태 렌더링 오류: {e}")
+        else:
+            print("⚠️ 초기 렌더링이 None을 반환했습니다.")
         
-        print(f"시연 완료 (총 {step_count} 스텝)")
+        done = False
+        truncated = False
+        step_count = 0
+        max_steps = 200  # 더 많은 스텝 허용
+        episode_reward = 0
         
-        # GIF 저장 (기존 코드 스타일 유지)
-        if figs:
+        print("에이전트 시연 중...")
+        
+        while not (done or truncated) and step_count < max_steps:
+            # 액션 마스크 가져오기
+            try:
+                action_masks = get_action_masks(env)
+                action, _states = model.predict(obs, action_masks=action_masks, deterministic=True)
+                
+                # 스텝 실행
+                obs, reward, done, truncated, info = env.step(action)
+                episode_reward += reward
+                
+                # 각 스텝 이후 렌더링
+                fig = env.render()
+                if fig is not None:
+                    try:
+                        fig_png = fig.to_image(format="png")
+                        buf = io.BytesIO(fig_png)
+                        img = Image.open(buf)
+                        figs.append(img)
+                    except Exception as e:
+                        print(f"스텝 {step_count} 렌더링 오류: {e}")
+                else:
+                    print(f"⚠️ 스텝 {step_count} 렌더링이 None을 반환했습니다.")
+                
+                step_count += 1
+                
+                # 진행상황 출력 (10스텝마다)
+                if step_count % 10 == 0:
+                    print(f"스텝 {step_count}: 누적 보상 = {episode_reward:.3f}")
+                    
+            except Exception as e:
+                print(f"스텝 {step_count} 실행 중 오류: {e}")
+                break
+        
+        print(f"시연 완료: {step_count}스텝, 총 보상: {episode_reward:.3f}")
+        print(f"캡처된 프레임 수: {len(figs)}")
+        
+        # GIF 저장
+        if len(figs) >= 2:  # 최소 2개 프레임이 있어야 함
             gif_filename = f'trained_maskable_ppo_{timestamp}.gif'
             gif_path = f'gifs/{gif_filename}'
             
-            figs[0].save(gif_path, format='GIF', 
-                        append_images=figs[1:],
-                        save_all=True, 
-                        duration=500, 
-                        loop=0)
-            print(f"GIF 저장 완료: {gif_filename}")
+            # 더 느린 속도로 GIF 생성 (각 프레임을 더 오래 보여줌)
+            frame_duration = max(300, min(800, 500))  # 300-800ms 사이
+            
+            try:
+                figs[0].save(
+                    gif_path, 
+                    format='GIF', 
+                    append_images=figs[1:],
+                    save_all=True, 
+                    duration=frame_duration,  # 프레임 지속시간
+                    loop=0,  # 무한 반복
+                    optimize=True  # 파일 크기 최적화
+                )
+                
+                # 파일 크기 확인
+                import os
+                file_size = os.path.getsize(gif_path)
+                print(f"✅ GIF 저장 완료: {gif_filename}")
+                print(f"   - 파일 크기: {file_size/1024:.1f} KB")
+                print(f"   - 프레임 수: {len(figs)}")
+                print(f"   - 프레임 지속시간: {frame_duration}ms")
+                
+            except Exception as e:
+                print(f"❌ GIF 저장 실패: {e}")
+                
+        elif len(figs) == 1:
+            print("⚠️ 프레임이 1개뿐입니다. 정적 이미지로 저장합니다.")
+            static_path = f'gifs/static_result_{timestamp}.png'
+            figs[0].save(static_path)
+            print(f"정적 이미지 저장: {static_path}")
+            
         else:
-            print("렌더링된 프레임이 없습니다.")
+            print("❌ 렌더링된 프레임이 없습니다.")
+            print("환경 설정을 확인해주세요:")
+            print(f"  - 환경 render_mode: {getattr(env, 'render_mode', 'None')}")
+            print(f"  - 환경 타입: {type(env)}")
+            
+            # 디버깅을 위한 간단한 테스트
+            print("\n디버깅: 환경 렌더링 테스트...")
+            try:
+                test_fig = env.render()
+                if test_fig is not None:
+                    print(f"  - 렌더링 결과 타입: {type(test_fig)}")
+                    print(f"  - 렌더링 가능: True")
+                else:
+                    print("  - 렌더링 결과: None")
+            except Exception as e:
+                print(f"  - 렌더링 테스트 실패: {e}")
             
     except Exception as e:
-        print(f"GIF 생성 중 오류 발생: {e}")
+        print(f"❌ GIF 생성 중 오류 발생: {e}")
+        import traceback
+        traceback.print_exc()
 
 
 def evaluate_model(model_path, num_episodes=5):
