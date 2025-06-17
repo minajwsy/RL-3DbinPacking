@@ -949,40 +949,134 @@ class ImprovedRewardWrapper(gym.Wrapper):
 
 def create_demonstration_gif(model, env, timestamp):
     """
-    학습된 모델의 시연 GIF 생성 (개선된 버전)
+    학습된 모델의 시연 GIF 생성 (KAMP 서버 호환 버전)
+    plotly 대신 matplotlib을 사용하여 안정적인 GIF 생성
     """
+    import matplotlib
+    matplotlib.use('Agg')  # 헤드리스 환경용 백엔드
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+    
     try:
-        print("=== GIF 시연 시작 ===")
+        print("=== matplotlib 기반 GIF 시연 시작 ===")
         
         # 환경 리셋
         obs, info = env.reset()
         
-        # 초기 상태 렌더링
-        initial_fig = env.render()
-        figs = []
-        
-        if initial_fig is not None:
+        def create_matplotlib_visualization(env, step_num=0):
+            """matplotlib으로 3D 패킹 상태 시각화"""
             try:
-                fig_png = initial_fig.to_image(format="png")
-                buf = io.BytesIO(fig_png)
-                img = Image.open(buf)
-                figs.append(img)
-                print("초기 상태 캡처 완료")
+                container_size = env.container.size
+                
+                # 3D 플롯 생성
+                fig = plt.figure(figsize=(10, 8))
+                ax = fig.add_subplot(111, projection='3d')
+                
+                # 컨테이너 경계 그리기
+                for i in range(2):
+                    for j in range(2):
+                        for k in range(2):
+                            ax.scatter([i*container_size[0]], [j*container_size[1]], [k*container_size[2]], 
+                                      color='red', s=20, alpha=0.7)
+                
+                # 컨테이너 경계 라인
+                edges = [
+                    # X축 라인
+                    ([0, container_size[0]], [0, 0], [0, 0]),
+                    ([0, container_size[0]], [container_size[1], container_size[1]], [0, 0]),
+                    ([0, container_size[0]], [0, 0], [container_size[2], container_size[2]]),
+                    ([0, container_size[0]], [container_size[1], container_size[1]], [container_size[2], container_size[2]]),
+                    # Y축 라인
+                    ([0, 0], [0, container_size[1]], [0, 0]),
+                    ([container_size[0], container_size[0]], [0, container_size[1]], [0, 0]),
+                    ([0, 0], [0, container_size[1]], [container_size[2], container_size[2]]),
+                    ([container_size[0], container_size[0]], [0, container_size[1]], [container_size[2], container_size[2]]),
+                    # Z축 라인
+                    ([0, 0], [0, 0], [0, container_size[2]]),
+                    ([container_size[0], container_size[0]], [0, 0], [0, container_size[2]]),
+                    ([0, 0], [container_size[1], container_size[1]], [0, container_size[2]]),
+                    ([container_size[0], container_size[0]], [container_size[1], container_size[1]], [0, container_size[2]])
+                ]
+                
+                for edge in edges:
+                    ax.plot(edge[0], edge[1], edge[2], 'r-', alpha=0.3)
+                
+                # 배치된 박스들 그리기
+                if hasattr(env, 'packed_boxes') and env.packed_boxes:
+                    colors = plt.cm.Set3(np.linspace(0, 1, len(env.packed_boxes)))
+                    
+                    for idx, box in enumerate(env.packed_boxes):
+                        x, y, z = box.position
+                        dx, dy, dz = box.size
+                        
+                        # 박스의 8개 꼭짓점
+                        vertices = [
+                            [x, y, z], [x+dx, y, z], [x+dx, y+dy, z], [x, y+dy, z],
+                            [x, y, z+dz], [x+dx, y, z+dz], [x+dx, y+dy, z+dz], [x, y+dy, z+dz]
+                        ]
+                        
+                        # 6개 면 정의
+                        faces = [
+                            [vertices[0], vertices[1], vertices[2], vertices[3]],  # 하단면
+                            [vertices[4], vertices[5], vertices[6], vertices[7]],  # 상단면
+                            [vertices[0], vertices[1], vertices[5], vertices[4]],  # 앞면
+                            [vertices[2], vertices[3], vertices[7], vertices[6]],  # 뒷면
+                            [vertices[0], vertices[3], vertices[7], vertices[4]],  # 왼쪽면
+                            [vertices[1], vertices[2], vertices[6], vertices[5]]   # 오른쪽면
+                        ]
+                        
+                        face_collection = Poly3DCollection(faces, alpha=0.7, 
+                                                         facecolor=colors[idx], edgecolor='black')
+                        ax.add_collection3d(face_collection)
+                
+                # 축 설정
+                ax.set_xlabel('X (Depth)')
+                ax.set_ylabel('Y (Length)')
+                ax.set_zlabel('Z (Height)')
+                ax.set_xlim(0, container_size[0])
+                ax.set_ylim(0, container_size[1])
+                ax.set_zlim(0, container_size[2])
+                
+                # 제목 설정
+                packed_count = len(env.packed_boxes) if hasattr(env, 'packed_boxes') else 0
+                ax.set_title(f'3D Bin Packing - Step {step_num}\n'
+                            f'배치된 박스: {packed_count}\n'
+                            f'컨테이너 크기: {container_size}', 
+                            fontsize=10)
+                
+                ax.grid(True, alpha=0.3)
+                ax.view_init(elev=20, azim=45)
+                plt.tight_layout()
+                
+                # 이미지로 변환
+                buffer = io.BytesIO()
+                plt.savefig(buffer, format='png', dpi=100, bbox_inches='tight')
+                buffer.seek(0)
+                image = Image.open(buffer)
+                plt.close(fig)  # 메모리 절약
+                
+                return image
+                
             except Exception as e:
-                print(f"초기 상태 렌더링 오류: {e}")
-        else:
-            print("⚠️ 초기 렌더링이 None을 반환했습니다.")
+                print(f"matplotlib 시각화 오류: {e}")
+                # 빈 이미지 반환
+                blank_img = Image.new('RGB', (800, 600), color='white')
+                return blank_img
+        
+        # 초기 상태 캡처
+        initial_img = create_matplotlib_visualization(env, step_num=0)
+        figs = [initial_img]
+        print("초기 상태 캡처 완료")
         
         done = False
         truncated = False
         step_count = 0
-        max_steps = 200  # 더 많은 스텝 허용
+        max_steps = 50  # 적절한 프레임 수
         episode_reward = 0
         
         print("에이전트 시연 중...")
         
         while not (done or truncated) and step_count < max_steps:
-            # 액션 마스크 가져오기
             try:
                 action_masks = get_action_masks(env)
                 action, _states = model.predict(obs, action_masks=action_masks, deterministic=True)
@@ -990,23 +1084,13 @@ def create_demonstration_gif(model, env, timestamp):
                 # 스텝 실행
                 obs, reward, done, truncated, info = env.step(action)
                 episode_reward += reward
-                
-                # 각 스텝 이후 렌더링
-                fig = env.render()
-                if fig is not None:
-                    try:
-                        fig_png = fig.to_image(format="png")
-                        buf = io.BytesIO(fig_png)
-                        img = Image.open(buf)
-                        figs.append(img)
-                    except Exception as e:
-                        print(f"스텝 {step_count} 렌더링 오류: {e}")
-                else:
-                    print(f"⚠️ 스텝 {step_count} 렌더링이 None을 반환했습니다.")
-                
                 step_count += 1
                 
-                # 진행상황 출력 (10스텝마다)
+                # 스텝 후 상태 캡처
+                step_img = create_matplotlib_visualization(env, step_num=step_count)
+                figs.append(step_img)
+                
+                # 진행상황 출력
                 if step_count % 10 == 0:
                     print(f"스텝 {step_count}: 누적 보상 = {episode_reward:.3f}")
                     
@@ -1018,12 +1102,11 @@ def create_demonstration_gif(model, env, timestamp):
         print(f"캡처된 프레임 수: {len(figs)}")
         
         # GIF 저장
-        if len(figs) >= 2:  # 최소 2개 프레임이 있어야 함
+        if len(figs) >= 2:
             gif_filename = f'trained_maskable_ppo_{timestamp}.gif'
             gif_path = f'gifs/{gif_filename}'
             
-            # 더 느린 속도로 GIF 생성 (각 프레임을 더 오래 보여줌)
-            frame_duration = max(300, min(800, 500))  # 300-800ms 사이
+            frame_duration = 800  # 0.8초
             
             try:
                 figs[0].save(
@@ -1031,9 +1114,9 @@ def create_demonstration_gif(model, env, timestamp):
                     format='GIF', 
                     append_images=figs[1:],
                     save_all=True, 
-                    duration=frame_duration,  # 프레임 지속시간
-                    loop=0,  # 무한 반복
-                    optimize=True  # 파일 크기 최적화
+                    duration=frame_duration,
+                    loop=0,
+                    optimize=True
                 )
                 
                 # 파일 크기 확인
@@ -1047,29 +1130,8 @@ def create_demonstration_gif(model, env, timestamp):
             except Exception as e:
                 print(f"❌ GIF 저장 실패: {e}")
                 
-        elif len(figs) == 1:
-            print("⚠️ 프레임이 1개뿐입니다. 정적 이미지로 저장합니다.")
-            static_path = f'gifs/static_result_{timestamp}.png'
-            figs[0].save(static_path)
-            print(f"정적 이미지 저장: {static_path}")
-            
         else:
-            print("❌ 렌더링된 프레임이 없습니다.")
-            print("환경 설정을 확인해주세요:")
-            print(f"  - 환경 render_mode: {getattr(env, 'render_mode', 'None')}")
-            print(f"  - 환경 타입: {type(env)}")
-            
-            # 디버깅을 위한 간단한 테스트
-            print("\n디버깅: 환경 렌더링 테스트...")
-            try:
-                test_fig = env.render()
-                if test_fig is not None:
-                    print(f"  - 렌더링 결과 타입: {type(test_fig)}")
-                    print(f"  - 렌더링 가능: True")
-                else:
-                    print("  - 렌더링 결과: None")
-            except Exception as e:
-                print(f"  - 렌더링 테스트 실패: {e}")
+            print("❌ 충분한 프레임이 없습니다.")
             
     except Exception as e:
         print(f"❌ GIF 생성 중 오류 발생: {e}")
