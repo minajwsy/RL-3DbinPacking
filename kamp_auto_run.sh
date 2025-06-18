@@ -7,7 +7,7 @@
 set -e
 
 # 브랜치 설정 (인자로 전달하거나 기본값 사용)
-BRANCH=${1:-master}
+BRANCH=${1:-main}
 
 # 환경 변수 설정
 WORK_DIR="${HOME}/RL-3DbinPacking"
@@ -59,8 +59,11 @@ git clean -fd || true
 echo "=== uv 패키지 매니저 확인 중 ==="
 if ! command -v uv &> /dev/null; then
     echo "uv가 설치되어 있지 않습니다. 설치를 진행합니다."
-    curl -LsSf https://astral.sh/uv/install.sh | sh
-    source $HOME/.cargo/env
+    # curl -LsSf https://astral.sh/uv/install.sh | sh
+    # source $HOME/.cargo/env
+    wget -qO- https://astral.sh/uv/install.sh | sh 
+    ls -al ~/.local/bin/uv 
+    export PATH="$HOME/.local/bin:$PATH"    
 fi
 
 echo "uv 버전: $(uv --version)"
@@ -68,8 +71,8 @@ echo "uv 버전: $(uv --version)"
 # Python 환경 설정
 echo "=== Python 환경 설정 중 ==="
 # Python 3.9 설치 및 가상환경 생성
-uv python install 3.9
-uv venv .venv --python 3.9
+uv python install 3.11      
+uv venv .venv --python 3.11
 source .venv/bin/activate
 
 # GPU 확인 및 적절한 의존성 설치
@@ -124,8 +127,8 @@ echo "=== 개선된 Maskable PPO 3D Bin Packing 학습 시작: $(date '+%Y-%m-%d
 export PYTHONPATH="${PWD}:${PYTHONPATH}"
 
 if python -m src.train_maskable_ppo \
-    --timesteps 200000 \
-    --eval-freq 15000 \
+    --timesteps 20000 \
+    --eval-freq 1500 \
     --container-size 10 10 10 \
     --num-boxes 32 \
     --curriculum-learning \

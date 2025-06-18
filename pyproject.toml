@@ -52,7 +52,7 @@ cpu = [
 ]
 
 [tool.uv]
-exclude-newer = "2024-06-01"
+#exclude-newer = "2024-06-01"
 
 [project.urls]
 Homepage = "https://github.com/your-username/RL-3DbinPacking"
