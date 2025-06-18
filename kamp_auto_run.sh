@@ -89,28 +89,36 @@ if nvidia-smi > /dev/null 2>&1; then
     # GPU 버전 PyTorch 설치
     uv pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
     
-    # kaleido 호환성 문제 해결을 위한 설정
+    # 필수 패키지 설치 (narwhals 포함)
     echo "=== 필수 패키지 개별 설치 중 ==="
     # 핵심 패키지들을 개별적으로 설치
     uv pip install gymnasium numpy nptyping pillow pandas jupyter pytest
     uv pip install sb3-contrib stable-baselines3 tensorboard matplotlib opencv-python tqdm
-    uv pip install plotly --no-deps  # kaleido 의존성 제외하고 plotly만 설치
     
-    echo "GPU 환경 설정 완료 (kaleido 제외)"
+    # plotly 관련 의존성 설치 (narwhals 포함)
+    echo "=== plotly 및 의존성 설치 중 ==="
+    uv pip install narwhals tenacity packaging
+    uv pip install plotly --no-deps  # 핵심 의존성은 별도 설치했으므로 --no-deps 사용
+    
+    echo "GPU 환경 설정 완료 (narwhals 포함)"
 else
     echo "GPU를 찾을 수 없습니다. CPU 버전 패키지를 설치합니다."
     
     # CPU 버전 PyTorch 설치
     uv pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
     
-    # kaleido 호환성 문제 해결을 위한 설정
+    # 필수 패키지 설치 (narwhals 포함)
     echo "=== 필수 패키지 개별 설치 중 ==="
     # 핵심 패키지들을 개별적으로 설치
     uv pip install gymnasium numpy nptyping pillow pandas jupyter pytest
     uv pip install sb3-contrib stable-baselines3 tensorboard matplotlib opencv-python tqdm
-    uv pip install plotly --no-deps  # kaleido 의존성 제외하고 plotly만 설치
     
-    echo "CPU 환경 설정 완료 (kaleido 제외)"
+    # plotly 관련 의존성 설치 (narwhals 포함)
+    echo "=== plotly 및 의존성 설치 중 ==="
+    uv pip install narwhals tenacity packaging
+    uv pip install plotly --no-deps  # 핵심 의존성은 별도 설치했으므로 --no-deps 사용
+    
+    echo "CPU 환경 설정 완료 (narwhals 포함)"
 fi
 
 # Python 경로 설정
