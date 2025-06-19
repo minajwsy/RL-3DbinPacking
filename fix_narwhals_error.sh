@@ -73,4 +73,4 @@ except ImportError as e:
 
 echo "=== narwhals 에러 해결 완료 ==="
 echo "이제 다음 명령어로 학습을 재시작할 수 있습니다:"
-echo "python -m src.train_maskable_ppo --timesteps 20000 --eval-freq 1500 --container-size 10 10 10 --num-boxes 32 --curriculum-learning --improved-rewards" 
+echo "python -m src.train_maskable_ppo --timesteps 20000 --eval-freq 1500 --container-size 10 10 10 --num-boxes 32 --curriculum-learning --improved-rewards"
