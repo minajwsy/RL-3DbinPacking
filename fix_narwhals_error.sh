@@ -20,7 +20,7 @@ uv pip install tenacity packaging
 
 # plotly 재설치 (의존성 포함)
 echo "=== plotly 재설치 중 ==="
-uv pip uninstall plotly --yes || true
+uv pip uninstall plotly -- yes || true
 uv pip install plotly
 
 # plotly_gif 설치 (누락된 의존성)
