@@ -252,59 +252,79 @@ class RealTimeMonitorCallback(BaseCallback):
                 print(f"빠른 플롯 업데이트 중 오류: {e}")
     
     def _perform_evaluation(self):
-        """모델 평가 수행 (활용률 포함)"""
+        """모델 평가 수행 (활용률 포함) - 빠른 평가로 최적화"""
         try:
             print(f"\n평가 수행 중... (스텝: {self.num_timesteps:,})")
             
-            # 평가 실행
+            # 평가 실행 (빠른 평가)
             eval_rewards = []
             eval_utilizations = []
             success_count = 0
             
-            for _ in range(self.n_eval_episodes):
-                obs, _ = self.eval_env.reset()
-                episode_reward = 0
-                done = False
-                truncated = False
-                step_count = 0
-                max_steps = 200
-                
-                while not (done or truncated) and step_count < max_steps:
-                    action_masks = get_action_masks(self.eval_env)
-                    action, _ = self.model.predict(obs, action_masks=action_masks, deterministic=True)
-                    obs, reward, done, truncated, info = self.eval_env.step(action)
-                    episode_reward += reward
-                    step_count += 1
-                
-                eval_rewards.append(episode_reward)
-                
-                # 활용률은 보상과 동일 (환경에서 활용률이 보상으로 사용됨)
-                episode_utilization = max(0.0, episode_reward)
-                eval_utilizations.append(episode_utilization)
-                
-                # 성공률 계산 (보상이 양수이면 성공으로 간주)
-                if episode_reward > 0:
-                    success_count += 1
+            # 더 적은 에피소드로 빠른 평가
+            n_eval = min(self.n_eval_episodes, 3)  # 최대 3개 에피소드만
             
-            mean_eval_reward = np.mean(eval_rewards)
-            mean_eval_utilization = np.mean(eval_utilizations)
-            success_rate = success_count / self.n_eval_episodes
+            for ep_idx in range(n_eval):
+                try:
+                    obs, _ = self.eval_env.reset()
+                    episode_reward = 0
+                    done = False
+                    truncated = False
+                    step_count = 0
+                    max_steps = 50  # 최대 스텝 수를 50으로 제한
+                    
+                    while not (done or truncated) and step_count < max_steps:
+                        try:
+                            action_masks = get_action_masks(self.eval_env)
+                            action, _ = self.model.predict(obs, action_masks=action_masks, deterministic=True)
+                            obs, reward, done, truncated, info = self.eval_env.step(action)
+                            episode_reward += reward
+                            step_count += 1
+                        except Exception as step_e:
+                            print(f"평가 에피소드 {ep_idx} 스텝 {step_count} 오류: {step_e}")
+                            break
+                    
+                    eval_rewards.append(episode_reward)
+                    
+                    # 활용률은 보상과 동일 (환경에서 활용률이 보상으로 사용됨)
+                    episode_utilization = max(0.0, episode_reward)
+                    eval_utilizations.append(episode_utilization)
+                    
+                    # 성공률 계산 (보상이 양수이면 성공으로 간주)
+                    if episode_reward > 0:
+                        success_count += 1
+                        
+                except Exception as ep_e:
+                    print(f"평가 에피소드 {ep_idx} 오류: {ep_e}")
+                    # 실패한 에피소드는 0으로 처리
+                    eval_rewards.append(0.0)
+                    eval_utilizations.append(0.0)
             
-            # 결과 저장
-            self.eval_rewards.append(mean_eval_reward)
-            self.eval_utilization_rates.append(mean_eval_utilization)
-            self.eval_timesteps.append(self.num_timesteps)
-            self.success_rates.append(success_rate)
-            
-            print(f"평가 완료: 평균 보상 {mean_eval_reward:.3f}, "
-                  f"평균 활용률 {mean_eval_utilization:.1%}, "
-                  f"성공률 {success_rate:.1%}")
+            # 평가 결과가 있을 때만 처리
+            if eval_rewards:
+                mean_eval_reward = np.mean(eval_rewards)
+                mean_eval_utilization = np.mean(eval_utilizations)
+                success_rate = success_count / len(eval_rewards)
+                
+                # 결과 저장
+                self.eval_rewards.append(mean_eval_reward)
+                self.eval_utilization_rates.append(mean_eval_utilization)
+                self.eval_timesteps.append(self.num_timesteps)
+                self.success_rates.append(success_rate)
+                
+                print(f"평가 완료: 평균 보상 {mean_eval_reward:.3f}, "
+                      f"평균 활용률 {mean_eval_utilization:.1%}, "
+                      f"성공률 {success_rate:.1%}")
+            else:
+                print("평가 에피소드 실행 실패")
             
         except Exception as e:
             print(f"평가 중 오류 발생: {e}")
-            if self.verbose > 1:
-                import traceback
-                traceback.print_exc()
+            # 오류 발생 시 기본값으로 진행
+            self.eval_rewards.append(0.0)
+            self.eval_utilization_rates.append(0.0)
+            self.eval_timesteps.append(self.num_timesteps)
+            self.success_rates.append(0.0)
     
     def _setup_plots(self):
         """플롯 초기 설정 (3x2 그리드)"""
@@ -1275,10 +1295,10 @@ def train_and_evaluate(
     # 실시간 모니터링 콜백 (개선된 버전)
     monitor_callback = RealTimeMonitorCallback(
         eval_env=eval_env,
-        eval_freq=max(eval_freq // 3, 1500),  # 더 자주 평가
-        n_eval_episodes=5,
+        eval_freq=max(eval_freq // 2, 2000),  # 평가 주기 조정
+        n_eval_episodes=3,  # 평가 에피소드 수 감소
         verbose=1,
-        update_freq=max(eval_freq // 15, 500)  # 더 자주 업데이트
+        update_freq=max(eval_freq // 10, 800)  # 업데이트 주기 조정
     )
     callbacks.append(monitor_callback)
     

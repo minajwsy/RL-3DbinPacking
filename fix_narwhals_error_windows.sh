@@ -41,15 +41,22 @@ echo "uv 버전: $(uv --version)"
 echo "=== 누락된 의존성 설치 중 ==="
 uv pip install narwhals
 uv pip install tenacity packaging
+uv pip install rich tqdm
+uv pip install rich tqdm
 
 # plotly 재설치 (의존성 포함)
 echo "=== plotly 재설치 중 ==="
-uv pip uninstall plotly --yes || true
+uv pip uninstall plotly -- yes || true
 uv pip install plotly
 
 # plotly_gif 설치 (누락된 의존성)
 echo "=== plotly_gif 설치 중 ==="
 uv pip install plotly_gif
+
+# stable-baselines3[extra] 재설치 (rich, tqdm 포함)
+echo "=== stable-baselines3[extra] 재설치 중 ==="
+uv pip uninstall stable-baselines3 -- yes || true
+uv pip install stable-baselines3[extra]
 
 # 설치 확인
 echo "=== 설치 확인 중 ==="
