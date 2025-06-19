@@ -20,8 +20,12 @@ uv pip install tenacity packaging
 
 # plotly 재설치 (의존성 포함)
 echo "=== plotly 재설치 중 ==="
-uv pip uninstall plotly -y || true
+uv pip uninstall plotly --yes || true
 uv pip install plotly
+
+# plotly_gif 설치 (누락된 의존성)
+echo "=== plotly_gif 설치 중 ==="
+uv pip install plotly_gif
 
 # 설치 확인
 echo "=== 설치 확인 중 ==="
@@ -51,6 +55,15 @@ try:
     print('✅ _plotly_utils.basevalidators 임포트 성공')
 except ImportError as e:
     print(f'❌ _plotly_utils.basevalidators 임포트 실패: {e}')
+
+try:
+    import plotly_gif
+    print('✅ plotly_gif 설치 확인')
+    print(f'   버전: {plotly_gif.__version__}')
+except ImportError as e:
+    print(f'❌ plotly_gif 설치 실패: {e}')
+except AttributeError:
+    print('✅ plotly_gif 설치 확인 (버전 정보 없음)')
 "
 
 # 학습 스크립트 테스트

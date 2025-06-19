@@ -99,8 +99,9 @@ if nvidia-smi > /dev/null 2>&1; then
     echo "=== plotly 및 의존성 설치 중 ==="
     uv pip install narwhals tenacity packaging
     uv pip install plotly --no-deps  # 핵심 의존성은 별도 설치했으므로 --no-deps 사용
+    uv pip install plotly_gif  # GIF 생성을 위한 추가 패키지
     
-    echo "GPU 환경 설정 완료 (narwhals 포함)"
+    echo "GPU 환경 설정 완료 (narwhals 및 plotly_gif 포함)"
 else
     echo "GPU를 찾을 수 없습니다. CPU 버전 패키지를 설치합니다."
     
@@ -117,8 +118,9 @@ else
     echo "=== plotly 및 의존성 설치 중 ==="
     uv pip install narwhals tenacity packaging
     uv pip install plotly --no-deps  # 핵심 의존성은 별도 설치했으므로 --no-deps 사용
+    uv pip install plotly_gif  # GIF 생성을 위한 추가 패키지
     
-    echo "CPU 환경 설정 완료 (narwhals 포함)"
+    echo "CPU 환경 설정 완료 (narwhals 및 plotly_gif 포함)"
 fi
 
 # Python 경로 설정
