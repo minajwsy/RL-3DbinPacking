@@ -353,7 +353,7 @@ class UltimateSafeCallback(BaseCallback):
         plt.close('all')
 
 def create_ultimate_gif(model, env, timestamp):
-    """개선된 GIF 생성 (matplotlib 기반)"""
+    """개선된 GIF 생성 (matplotlib 기반) - 안전한 환경 처리"""
     print("🎬 고품질 GIF 생성 중...")
     
     try:
@@ -363,14 +363,47 @@ def create_ultimate_gif(model, env, timestamp):
         from PIL import Image
         import io
         
-        frames = []
-        obs, _ = env.reset()
+        # 환경 상태 확인
+        if env is None:
+            print("❌ 환경이 None입니다")
+            return None
+            
+        # GIF 전용 새로운 환경 생성 (안전한 방법)
+        print("🔧 GIF 전용 환경 생성 중...")
+        try:
+            # 원본 환경과 동일한 설정으로 새 환경 생성
+            gif_env = make_env(
+                container_size=[10, 10, 10],
+                num_boxes=16,  # 기본값 사용
+                num_visible_boxes=3,
+                seed=42,
+                render_mode=None,
+                random_boxes=False,
+                only_terminal_reward=False,
+                improved_reward_shaping=True,
+            )()
+        except Exception as e:
+            print(f"❌ GIF 환경 생성 실패: {e}")
+            return None
         
-        # 초기 상태 캡처
+        frames = []
+        
+        try:
+            obs, _ = gif_env.reset()
+            print(f"✅ GIF 환경 리셋 완료")
+        except Exception as e:
+            print(f"❌ GIF 환경 리셋 실패: {e}")
+            gif_env.close()
+            return None
+        
+        # matplotlib 설정
+        plt.ioff()  # 인터랙티브 모드 비활성화
         fig = plt.figure(figsize=(12, 8))
         ax = fig.add_subplot(111, projection='3d')
         
-        for step in range(50):  # 최대 50 프레임
+        print(f"🎬 프레임 생성 시작 (최대 30 프레임)")
+        
+        for step in range(30):  # 프레임 수 줄임 (안정성 향상)
             try:
                 # 현재 상태 시각화
                 ax.clear()
@@ -380,62 +413,104 @@ def create_ultimate_gif(model, env, timestamp):
                 ax.set_xlabel('X')
                 ax.set_ylabel('Y')
                 ax.set_zlabel('Z')
-                ax.set_title(f'3D Bin Packing - Step {step}')
+                ax.set_title(f'3D Bin Packing - Step {step}', fontsize=14)
                 
                 # 컨테이너 그리기
                 container_color = 'lightblue'
                 ax.bar3d(0, 0, 0, 10, 10, 0.1, color=container_color, alpha=0.3)
                 
                 # 박스들 그리기 (환경에서 정보 추출)
-                if hasattr(env, 'unwrapped') and hasattr(env.unwrapped, 'container'):
-                    container = env.unwrapped.container
-                    for box in container.boxes:
-                        if box.position is not None:
-                            x, y, z = box.position
-                            w, h, d = box.size
-                            color = plt.cm.Set3(hash(str(box.size)) % 12)
-                            ax.bar3d(x, y, z, w, h, d, color=color, alpha=0.8, edgecolor='black')
+                try:
+                    if hasattr(gif_env, 'unwrapped') and hasattr(gif_env.unwrapped, 'container'):
+                        container = gif_env.unwrapped.container
+                        box_count = 0
+                        for box in container.boxes:
+                            if hasattr(box, 'position') and box.position is not None:
+                                x, y, z = box.position
+                                w, h, d = box.size
+                                color = plt.cm.Set3(box_count % 12)
+                                ax.bar3d(x, y, z, w, h, d, color=color, alpha=0.8, edgecolor='black')
+                                box_count += 1
+                        
+                        if box_count > 0:
+                            ax.text2D(0.02, 0.98, f'배치된 박스: {box_count}개', 
+                                    transform=ax.transAxes, fontsize=12, 
+                                    bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8))
+                except Exception as box_e:
+                    print(f"⚠️ 박스 렌더링 오류 (스텝 {step}): {box_e}")
                 
-                # 프레임 저장
-                buf = io.BytesIO()
-                plt.savefig(buf, format='png', dpi=100, bbox_inches='tight')
-                buf.seek(0)
-                frame = Image.open(buf)
-                frames.append(frame)
-                buf.close()
+                # 프레임 저장 (안전한 방법)
+                try:
+                    buf = io.BytesIO()
+                    plt.savefig(buf, format='png', dpi=100, bbox_inches='tight', 
+                              facecolor='white', edgecolor='none')
+                    buf.seek(0)
+                    frame = Image.open(buf).copy()  # 복사본 생성
+                    frames.append(frame)
+                    buf.close()
+                    
+                    if step % 5 == 0:
+                        print(f"  프레임 {step + 1}/30 완료")
+                        
+                except Exception as save_e:
+                    print(f"⚠️ 프레임 저장 오류 (스텝 {step}): {save_e}")
+                    continue
                 
-                # 다음 액션 수행
-                action_masks = get_action_masks(env)
-                action, _ = model.predict(obs, action_masks=action_masks, deterministic=True)
-                obs, reward, terminated, truncated, info = env.step(action)
-                
-                if terminated or truncated or step >= 49:
+                # 다음 액션 수행 (안전한 방법)
+                try:
+                    action_masks = get_action_masks(gif_env)
+                    action, _ = model.predict(obs, action_masks=action_masks, deterministic=True)
+                    obs, reward, terminated, truncated, info = gif_env.step(action)
+                    
+                    if terminated or truncated:
+                        print(f"  에피소드 종료 (스텝 {step + 1})")
+                        break
+                        
+                except Exception as step_e:
+                    print(f"⚠️ 액션 수행 오류 (스텝 {step}): {step_e}")
                     break
                     
-            except Exception as e:
-                print(f"⚠️ GIF 프레임 {step} 생성 오류: {e}")
+            except Exception as frame_e:
+                print(f"⚠️ 프레임 {step} 생성 중 오류: {frame_e}")
                 break
         
+        # 리소스 정리
         plt.close(fig)
+        gif_env.close()
         
         # GIF 저장
-        if frames:
-            gif_path = f'gifs/ultimate_demo_{timestamp}.gif'
-            frames[0].save(
-                gif_path,
-                save_all=True,
-                append_images=frames[1:],
-                duration=500,  # 0.5초 간격
-                loop=0
-            )
-            print(f"🎬 GIF 저장 완료: {gif_path} ({len(frames)} 프레임)")
-            return gif_path
+        if len(frames) >= 3:  # 최소 3 프레임 이상
+            try:
+                gif_path = f'gifs/ultimate_demo_{timestamp}.gif'
+                os.makedirs('gifs', exist_ok=True)
+                
+                frames[0].save(
+                    gif_path,
+                    save_all=True,
+                    append_images=frames[1:],
+                    duration=800,  # 0.8초 간격 (더 느리게)
+                    loop=0
+                )
+                
+                # 파일 크기 확인
+                file_size = os.path.getsize(gif_path)
+                print(f"🎬 GIF 저장 완료: {gif_path}")
+                print(f"  📊 프레임 수: {len(frames)}")
+                print(f"  📏 파일 크기: {file_size / 1024:.1f} KB")
+                
+                return gif_path
+                
+            except Exception as save_e:
+                print(f"❌ GIF 파일 저장 오류: {save_e}")
+                return None
         else:
-            print("❌ GIF 프레임 생성 실패")
+            print(f"❌ 충분한 프레임 없음 ({len(frames)}개)")
             return None
             
     except Exception as e:
-        print(f"❌ GIF 생성 오류: {e}")
+        print(f"❌ GIF 생성 전체 오류: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 def ultimate_train(
@@ -607,7 +682,8 @@ def ultimate_train(
         mean_reward = np.mean(final_rewards) if final_rewards else 0.0
         print(f"📊 최종 평균 보상: {mean_reward:.4f}")
         
-        # GIF 생성
+        # GIF 생성 (환경 닫기 전에 수행)
+        gif_path = None
         if create_gif:
             print("\n🎬 GIF 생성 중...")
             try:
@@ -619,6 +695,10 @@ def ultimate_train(
             except Exception as e:
                 print(f"⚠️ GIF 생성 오류: {e} - 학습은 성공적으로 완료됨")
         
+        # 환경 정리 (GIF 생성 후)
+        env.close()
+        eval_env.close()
+        
         # 결과 요약
         results = {
             "timestamp": timestamp,
@@ -629,7 +709,8 @@ def ultimate_train(
             "num_boxes": num_boxes,
             "model_path": model_path,
             "eval_freq": eval_freq,
-            "callbacks_used": callbacks is not None
+            "callbacks_used": callbacks is not None,
+            "gif_path": gif_path if gif_path else "GIF 생성 실패"
         }
         
         # 결과 저장
@@ -640,10 +721,6 @@ def ultimate_train(
                 f.write(f"{key}: {value}\n")
         
         print(f"📄 결과 저장: {results_path}")
-        
-        # 환경 정리
-        env.close()
-        eval_env.close()
         
         return model, results
         
