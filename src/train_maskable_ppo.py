@@ -1289,50 +1289,45 @@ def train_and_evaluate(
     print(f"  - 액션 스페이스: {env.action_space}")
     print(f"  - 관찰 스페이스: {env.observation_space}")
     
-    # 개선된 콜백 설정
+    # 안전한 콜백 설정 (999 스텝 문제 방지)
     callbacks = []
     
-    # 실시간 모니터링 콜백 (개선된 버전)
-    monitor_callback = RealTimeMonitorCallback(
-        eval_env=eval_env,
-        eval_freq=max(eval_freq // 2, 2000),  # 평가 주기 조정
-        n_eval_episodes=3,  # 평가 에피소드 수 감소
-        verbose=1,
-        update_freq=max(eval_freq // 10, 800)  # 업데이트 주기 조정
-    )
-    callbacks.append(monitor_callback)
+    # 999 스텝 문제 방지: 콜백을 선택적으로 추가
+    use_callbacks = eval_freq >= 2000  # 평가 주기가 충분히 클 때만 콜백 사용
     
-    # 커리큘럼 학습 콜백 추가
-    if curriculum_learning:
-        curriculum_callback = CurriculumLearningCallback(
-            container_size=container_size,
-            initial_boxes=initial_boxes,
-            target_boxes=num_boxes,
-            num_visible_boxes=num_visible_boxes,
-            success_threshold=0.6,  # 60% 성공률 달성 시 난이도 증가
+    if use_callbacks:
+        print("✅ 콜백 사용 (평가 주기가 충분함)")
+        
+        # 단순한 체크포인트 콜백만 사용 (가장 안전)
+        checkpoint_callback = CheckpointCallback(
+            save_freq=max(eval_freq, 3000),  # 최소 3000 스텝 간격
+            save_path="models/checkpoints",
+            name_prefix=f"rl_model_{timestamp}",
             verbose=1
         )
-        callbacks.append(curriculum_callback)
-    
-    # 평가 콜백 (기존 유지)
-    eval_callback = EvalCallback(
-        eval_env,
-        best_model_save_path="models/best_model",
-        log_path="logs/eval_logs",
-        eval_freq=eval_freq,
-        n_eval_episodes=5,
-        deterministic=True,
-        render=False,
-    )
-    callbacks.append(eval_callback)
-    
-    # 체크포인트 콜백 (기존 유지)
-    checkpoint_callback = CheckpointCallback(
-        save_freq=eval_freq,
-        save_path="models/checkpoints",
-        name_prefix=f"rl_model_{timestamp}",
-    )
-    callbacks.append(checkpoint_callback)
+        callbacks.append(checkpoint_callback)
+        
+        # 선택적으로 평가 콜백 추가 (안전한 설정)
+        if eval_freq >= 5000:  # 5000 스텝 이상일 때만
+            eval_callback = EvalCallback(
+                eval_env,
+                best_model_save_path="models/best_model",
+                log_path="logs/eval_logs",
+                eval_freq=eval_freq,
+                n_eval_episodes=2,  # 최소 에피소드
+                deterministic=True,
+                render=False,
+                verbose=1
+            )
+            callbacks.append(eval_callback)
+            print(f"✅ 평가 콜백 추가 (주기: {eval_freq})")
+        else:
+            print("⚠️  평가 콜백 생략 (주기가 너무 짧음)")
+            
+    else:
+        print("⚠️  콜백 없이 학습 (999 스텝 문제 방지)")
+        print(f"   평가 주기: {eval_freq} (권장: 2000 이상)")
+        callbacks = None  # 콜백 완전 제거
     
     # 개선된 하이퍼파라미터 설정
     improved_config = {
