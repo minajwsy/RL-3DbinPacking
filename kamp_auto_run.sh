@@ -132,36 +132,52 @@ mkdir -p models results logs gifs
 # Maskable PPO 실험 실행
 echo "=== 개선된 Maskable PPO 3D Bin Packing 학습 시작: $(date '+%Y-%m-%d %H:%M:%S') ==="
 
-# 개선된 학습 실행 (더 긴 학습 시간과 개선된 하이퍼파라미터)
+# 999 스텝 문제 완전 해결을 위한 Ultimate 학습 실행
 # PYTHONPATH 설정으로 환경 등록 문제 해결
 export PYTHONPATH="${PWD}:${PYTHONPATH}"
 
-if python -m src.train_maskable_ppo \
-    --timesteps 20000 \
-    --eval-freq 1500 \
-    --container-size 10 10 10 \
-    --num-boxes 32 \
-    --curriculum-learning \
-    --improved-rewards \
-    2>&1 | tee results/improved_training_output_${TIMESTAMP}.txt; then
-    echo "개선된 Maskable PPO 학습이 성공적으로 완료되었습니다."
+echo "🚀 999 스텝 문제 완전 해결 학습 시작"
+echo "📋 설정: 안전한 평가 주기 사용, GIF 및 성능 그래프 생성"
+
+if python ultimate_train_fix.py \
+    --timesteps 10000 \
+    --eval-freq 3000 \
+    --num-boxes 24 \
+    2>&1 | tee results/ultimate_training_output_${TIMESTAMP}.txt; then
+    echo "✅ Ultimate 학습이 성공적으로 완료되었습니다."
     
     # 학습 성과 요약 출력
-    echo "=== 학습 결과 요약 ==="
-    if ls results/comprehensive_summary_*.txt >/dev/null 2>&1; then
+    echo "=== Ultimate 학습 결과 요약 ==="
+    if ls results/ultimate_results_*.txt >/dev/null 2>&1; then
         echo "📊 최신 학습 요약:"
-        tail -20 $(ls -t results/comprehensive_summary_*.txt | head -1)
+        tail -20 $(ls -t results/ultimate_results_*.txt | head -1)
     fi
     
-    # 실시간 모니터링 차트 확인
-    if ls results/improved_final_dashboard_*.png >/dev/null 2>&1; then
+    # 성능 대시보드 확인
+    if ls results/ultimate_dashboard_*.png >/dev/null 2>&1; then
         echo "📈 최종 성과 대시보드 생성됨:"
-        ls -la results/improved_final_dashboard_*.png | tail -1
+        ls -la results/ultimate_dashboard_*.png | tail -1
+    fi
+    
+    # GIF 파일 확인
+    if ls gifs/ultimate_demo_*.gif >/dev/null 2>&1; then
+        echo "🎬 학습 데모 GIF 생성됨:"
+        ls -la gifs/ultimate_demo_*.gif | tail -1
     fi
     
 else
-    echo "❌ 학습 실행 중 오류가 발생했습니다. 오류 로그를 확인하세요."
-    # 오류가 있더라도 계속 진행 (기존 로직 유지)
+    echo "❌ Ultimate 학습 실행 중 오류가 발생했습니다."
+    echo "🔄 대안으로 콜백 없는 학습을 시도합니다..."
+    
+    # 대안: 콜백 없는 순수 학습
+    if python no_callback_train.py \
+        --timesteps 8000 \
+        --num-boxes 20 \
+        2>&1 | tee results/fallback_training_output_${TIMESTAMP}.txt; then
+        echo "✅ 대안 학습이 성공적으로 완료되었습니다."
+    else
+        echo "❌ 대안 학습도 실패했습니다. 로그를 확인하세요."
+    fi
 fi
 
 # 실험이 성공/실패와 관계없이 5초 대기 (기존 로직 유지)
@@ -197,13 +213,13 @@ git status
 echo "=== 결과 파일 추가 중 ==="
 
 # 학습 결과 파일 추가
-if [ -f "results/improved_training_output_${TIMESTAMP}.txt" ]; then
-    git add "results/improved_training_output_${TIMESTAMP}.txt"
+if [ -f "results/ultimate_training_output_${TIMESTAMP}.txt" ]; then
+    git add "results/ultimate_training_output_${TIMESTAMP}.txt"
     echo "학습 결과 파일이 추가되었습니다."
 fi
 
 # 학습 결과 요약 파일 추가
-RESULTS_FILES=$(find "results" -name "comprehensive_summary_*.txt" 2>/dev/null)
+RESULTS_FILES=$(find "results" -name "ultimate_results_*.txt" 2>/dev/null)
 if [ -n "$RESULTS_FILES" ]; then
     git add $RESULTS_FILES
     echo "학습 결과 요약 파일이 추가되었습니다."
@@ -216,7 +232,7 @@ if [ -f "results/evaluation_${TIMESTAMP}.txt" ]; then
 fi
 
 # 모델 파일 추가 (용량이 클 수 있으므로 선택적)
-MODEL_FILES=$(find "models" -name "ppo_mask_*.zip" -newer "results/improved_training_output_${TIMESTAMP}.txt" 2>/dev/null || true)
+MODEL_FILES=$(find "models" -name "ppo_mask_*.zip" -newer "results/ultimate_training_output_${TIMESTAMP}.txt" 2>/dev/null || true)
 if [ -n "$MODEL_FILES" ]; then
     echo "새로운 모델 파일 발견, 추가 여부 확인 중..."
     # 파일 크기 확인 (100MB 이하만 추가)
@@ -240,7 +256,7 @@ if [ -n "$PNG_FILES" ]; then
     echo "PNG 파일이 추가되었습니다."
 fi
 
-GIF_FILES=$(find "gifs" -name "*.gif" -newer "results/improved_training_output_${TIMESTAMP}.txt" 2>/dev/null || true)
+GIF_FILES=$(find "gifs" -name "*.gif" -newer "results/ultimate_training_output_${TIMESTAMP}.txt" 2>/dev/null || true)
 if [ -n "$GIF_FILES" ]; then
     git add $GIF_FILES
     echo "GIF 파일이 추가되었습니다."
