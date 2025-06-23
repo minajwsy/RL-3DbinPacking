@@ -212,7 +212,7 @@ except ImportError as e:
 
 echo "=== narwhals 에러 해결 완료 ==="
 echo "이제 다음 명령어로 학습을 시작 :"
-echo "python -m src.train_maskable_ppo --timesteps 20000 --eval-freq 1500 --container-size 10 10 10 --num-boxes 32 --curriculum-learning --improved-rewards"
+echo "python -m src.ultimate_train_fix --timesteps 20000 --eval-freq 1500 --container-size 10 10 10 --num-boxes 32 --curriculum-learning --improved-rewards"
 
 # Python 경로 설정
 export PYTHONPATH="${PWD}/src:${PYTHONPATH}"
@@ -230,7 +230,7 @@ export PYTHONPATH="${PWD}:${PYTHONPATH}"
 echo "🚀 999 스텝 문제 완전 해결 학습 시작"
 echo "📋 설정: 안전한 평가 주기 사용, GIF 및 성능 그래프 생성"
 
-if python ultimate_train_fix.py \
+if python src.ultimate_train_fix.py \
     --timesteps 30000 \
     --eval-freq 2500 \
     --num-boxes 18 \
@@ -261,7 +261,7 @@ else
     echo "🔄 대안으로 콜백 없는 학습을 시도합니다..."
     
     # 대안: 콜백 없는 순수 학습
-    if python no_callback_train.py \
+    if python src.no_callback_train.py \
         --timesteps 8000 \
         --num-boxes 20 \
         2>&1 | tee results/fallback_training_output_${TIMESTAMP}.txt; then
