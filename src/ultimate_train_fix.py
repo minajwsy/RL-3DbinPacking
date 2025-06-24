@@ -18,6 +18,11 @@ from pathlib import Path
 matplotlib.use('Agg')
 warnings.filterwarnings("ignore")
 
+# 폰트 설정 (한글 폰트 문제 해결)
+plt.rcParams['font.family'] = 'DejaVu Sans'
+plt.rcParams['font.size'] = 10
+plt.rcParams['axes.unicode_minus'] = False
+
 # 경로 설정
 sys.path.append('src')
 os.environ['PYTHONPATH'] = os.getcwd() + ':' + os.getcwd() + '/src'
@@ -56,7 +61,7 @@ class UltimateSafeCallback(BaseCallback):
         
         # 실시간 플롯 설정
         self.fig, self.axes = plt.subplots(2, 2, figsize=(15, 10))
-        self.fig.suptitle('실시간 학습 성과 모니터링', fontsize=16)
+        self.fig.suptitle('Real-time Training Performance Monitoring', fontsize=16)
         plt.ion()
         
         print(f"🛡️ 안전한 콜백 초기화 완료 (평가 주기: {eval_freq})")
@@ -175,16 +180,16 @@ class UltimateSafeCallback(BaseCallback):
     def _setup_plots(self):
         """플롯 초기 설정"""
         titles = [
-            '에피소드 보상 (학습 중)',
-            '평가 보상 (주기적)',
-            '성공률 (%)',
-            '활용률 (%)'
+            'Episode Rewards (Training)',
+            'Evaluation Rewards (Periodic)',
+            'Success Rate (%)',
+            'Utilization Rate (%)'
         ]
         
         for i, ax in enumerate(self.axes.flat):
             ax.set_title(titles[i])
             ax.grid(True, alpha=0.3)
-            ax.set_xlabel('스텝')
+            ax.set_xlabel('Steps')
     
     def _update_plots(self):
         """실시간 플롯 업데이트"""
@@ -198,9 +203,9 @@ class UltimateSafeCallback(BaseCallback):
                     window = min(50, len(self.episode_rewards) // 4)
                     moving_avg = np.convolve(self.episode_rewards, np.ones(window)/window, mode='valid')
                     moving_steps = self.timesteps[window-1:]
-                    self.axes[0, 0].plot(moving_steps, moving_avg, 'r-', linewidth=2, label=f'이동평균({window})')
+                    self.axes[0, 0].plot(moving_steps, moving_avg, 'r-', linewidth=2, label=f'Moving Avg({window})')
                     self.axes[0, 0].legend()
-                self.axes[0, 0].set_title('에피소드 보상 (학습 중)')
+                self.axes[0, 0].set_title('Episode Rewards (Training)')
                 self.axes[0, 0].grid(True, alpha=0.3)
             
             # 2. 평가 보상
@@ -208,7 +213,7 @@ class UltimateSafeCallback(BaseCallback):
                 self.axes[0, 1].clear()
                 self.axes[0, 1].plot(self.eval_timesteps, self.eval_rewards, 'g-o', linewidth=2, markersize=6)
                 self.axes[0, 1].axhline(y=0, color='k', linestyle='--', alpha=0.5)
-                self.axes[0, 1].set_title('평가 보상 (주기적)')
+                self.axes[0, 1].set_title('Evaluation Rewards (Periodic)')
                 self.axes[0, 1].grid(True, alpha=0.3)
             
             # 3. 성공률
@@ -216,9 +221,9 @@ class UltimateSafeCallback(BaseCallback):
                 self.axes[1, 0].clear()
                 success_pct = [rate * 100 for rate in self.success_rates]
                 self.axes[1, 0].plot(self.eval_timesteps, success_pct, 'orange', linewidth=2, marker='s')
-                self.axes[1, 0].axhline(y=80, color='red', linestyle='--', alpha=0.7, label='목표(80%)')
+                self.axes[1, 0].axhline(y=80, color='red', linestyle='--', alpha=0.7, label='Target(80%)')
                 self.axes[1, 0].set_ylim(0, 100)
-                self.axes[1, 0].set_title('성공률 (%)')
+                self.axes[1, 0].set_title('Success Rate (%)')
                 self.axes[1, 0].grid(True, alpha=0.3)
                 self.axes[1, 0].legend()
             
@@ -228,7 +233,7 @@ class UltimateSafeCallback(BaseCallback):
                 util_pct = [rate * 100 for rate in self.utilization_rates]
                 self.axes[1, 1].plot(self.eval_timesteps, util_pct, 'purple', linewidth=2, marker='^')
                 self.axes[1, 1].set_ylim(0, 100)
-                self.axes[1, 1].set_title('활용률 (%)')
+                self.axes[1, 1].set_title('Utilization Rate (%)')
                 self.axes[1, 1].grid(True, alpha=0.3)
             
             # 플롯 저장
@@ -247,20 +252,20 @@ class UltimateSafeCallback(BaseCallback):
         
         # 최종 성과 대시보드
         fig, axes = plt.subplots(2, 3, figsize=(18, 12))
-        fig.suptitle('최종 학습 성과 대시보드', fontsize=20)
+        fig.suptitle('Final Training Performance Dashboard', fontsize=20)
         
         try:
             # 1. 학습 곡선
             if self.timesteps and self.episode_rewards:
-                axes[0, 0].plot(self.timesteps, self.episode_rewards, 'b-', alpha=0.4, linewidth=1, label='에피소드 보상')
+                axes[0, 0].plot(self.timesteps, self.episode_rewards, 'b-', alpha=0.4, linewidth=1, label='Episode Rewards')
                 if len(self.episode_rewards) > 20:
                     window = min(50, len(self.episode_rewards) // 4)
                     moving_avg = np.convolve(self.episode_rewards, np.ones(window)/window, mode='valid')
                     moving_steps = self.timesteps[window-1:]
-                    axes[0, 0].plot(moving_steps, moving_avg, 'r-', linewidth=3, label=f'이동평균({window})')
-                axes[0, 0].set_title('학습 곡선')
-                axes[0, 0].set_xlabel('스텝')
-                axes[0, 0].set_ylabel('보상')
+                    axes[0, 0].plot(moving_steps, moving_avg, 'r-', linewidth=3, label=f'Moving Avg({window})')
+                axes[0, 0].set_title('Learning Curve')
+                axes[0, 0].set_xlabel('Steps')
+                axes[0, 0].set_ylabel('Reward')
                 axes[0, 0].legend()
                 axes[0, 0].grid(True, alpha=0.3)
             
@@ -268,20 +273,20 @@ class UltimateSafeCallback(BaseCallback):
             if self.eval_timesteps and self.eval_rewards:
                 axes[0, 1].plot(self.eval_timesteps, self.eval_rewards, 'g-o', linewidth=3, markersize=8)
                 axes[0, 1].axhline(y=0, color='k', linestyle='--', alpha=0.5)
-                axes[0, 1].set_title('평가 성능')
-                axes[0, 1].set_xlabel('스텝')
-                axes[0, 1].set_ylabel('평가 보상')
+                axes[0, 1].set_title('Evaluation Performance')
+                axes[0, 1].set_xlabel('Steps')
+                axes[0, 1].set_ylabel('Evaluation Reward')
                 axes[0, 1].grid(True, alpha=0.3)
             
             # 3. 성공률 추이
             if self.eval_timesteps and self.success_rates:
                 success_pct = [rate * 100 for rate in self.success_rates]
                 axes[0, 2].plot(self.eval_timesteps, success_pct, 'orange', linewidth=3, marker='s', markersize=8)
-                axes[0, 2].axhline(y=80, color='red', linestyle='--', alpha=0.7, label='목표(80%)')
+                axes[0, 2].axhline(y=80, color='red', linestyle='--', alpha=0.7, label='Target(80%)')
                 axes[0, 2].set_ylim(0, 100)
-                axes[0, 2].set_title('성공률 추이')
-                axes[0, 2].set_xlabel('스텝')
-                axes[0, 2].set_ylabel('성공률 (%)')
+                axes[0, 2].set_title('Success Rate Trend')
+                axes[0, 2].set_xlabel('Steps')
+                axes[0, 2].set_ylabel('Success Rate (%)')
                 axes[0, 2].legend()
                 axes[0, 2].grid(True, alpha=0.3)
             
@@ -290,18 +295,18 @@ class UltimateSafeCallback(BaseCallback):
                 util_pct = [rate * 100 for rate in self.utilization_rates]
                 axes[1, 0].plot(self.eval_timesteps, util_pct, 'purple', linewidth=3, marker='^', markersize=8)
                 axes[1, 0].set_ylim(0, 100)
-                axes[1, 0].set_title('활용률 추이')
-                axes[1, 0].set_xlabel('스텝')
-                axes[1, 0].set_ylabel('활용률 (%)')
+                axes[1, 0].set_title('Utilization Rate Trend')
+                axes[1, 0].set_xlabel('Steps')
+                axes[1, 0].set_ylabel('Utilization Rate (%)')
                 axes[1, 0].grid(True, alpha=0.3)
             
             # 5. 보상 분포
             if self.episode_rewards:
                 axes[1, 1].hist(self.episode_rewards, bins=30, alpha=0.7, color='skyblue', edgecolor='black')
-                axes[1, 1].axvline(np.mean(self.episode_rewards), color='red', linestyle='--', linewidth=2, label=f'평균: {np.mean(self.episode_rewards):.3f}')
-                axes[1, 1].set_title('보상 분포')
-                axes[1, 1].set_xlabel('보상')
-                axes[1, 1].set_ylabel('빈도')
+                axes[1, 1].axvline(np.mean(self.episode_rewards), color='red', linestyle='--', linewidth=2, label=f'Mean: {np.mean(self.episode_rewards):.3f}')
+                axes[1, 1].set_title('Reward Distribution')
+                axes[1, 1].set_xlabel('Reward')
+                axes[1, 1].set_ylabel('Frequency')
                 axes[1, 1].legend()
                 axes[1, 1].grid(True, alpha=0.3)
             
@@ -309,23 +314,23 @@ class UltimateSafeCallback(BaseCallback):
             axes[1, 2].axis('off')
             if self.episode_rewards and self.eval_rewards:
                 summary_text = f"""
-학습 요약 통계
+Training Summary Statistics
 
-총 에피소드: {len(self.episode_rewards):,}
-최종 스텝: {self.num_timesteps:,}
-학습 시간: {(time.time() - self.start_time):.1f}초
+Total Episodes: {len(self.episode_rewards):,}
+Final Steps: {self.num_timesteps:,}
+Training Time: {(time.time() - self.start_time):.1f}s
 
-학습 성과:
-• 평균 보상: {np.mean(self.episode_rewards):.3f}
-• 최고 보상: {np.max(self.episode_rewards):.3f}
-• 최저 보상: {np.min(self.episode_rewards):.3f}
-• 표준편차: {np.std(self.episode_rewards):.3f}
+Training Performance:
+• Mean Reward: {np.mean(self.episode_rewards):.3f}
+• Max Reward: {np.max(self.episode_rewards):.3f}
+• Min Reward: {np.min(self.episode_rewards):.3f}
+• Std Dev: {np.std(self.episode_rewards):.3f}
 
-평가 성과:
-• 최종 평가 보상: {self.eval_rewards[-1] if self.eval_rewards else 0:.3f}
-• 최고 평가 보상: {np.max(self.eval_rewards) if self.eval_rewards else 0:.3f}
-• 최종 성공률: {self.success_rates[-1]*100 if self.success_rates else 0:.1f}%
-• 최종 활용률: {self.utilization_rates[-1]*100 if self.utilization_rates else 0:.1f}%
+Evaluation Performance:
+• Final Eval Reward: {self.eval_rewards[-1] if self.eval_rewards else 0:.3f}
+• Best Eval Reward: {np.max(self.eval_rewards) if self.eval_rewards else 0:.3f}
+• Final Success Rate: {self.success_rates[-1]*100 if self.success_rates else 0:.1f}%
+• Final Utilization: {self.utilization_rates[-1]*100 if self.utilization_rates else 0:.1f}%
 """
                 axes[1, 2].text(0.05, 0.95, summary_text, transform=axes[1, 2].transAxes, 
                                fontsize=12, verticalalignment='top', fontfamily='monospace',
