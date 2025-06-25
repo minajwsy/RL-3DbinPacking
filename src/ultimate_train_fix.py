@@ -109,7 +109,7 @@ class UltimateSafeCallback(BaseCallback):
             
             eval_rewards = []
             success_count = 0
-            max_episodes = 2  # 매우 적은 에피소드
+            max_episodes = 5  # 매우 적은 에피소드 
             
             for ep_idx in range(max_episodes):
                 try:
@@ -617,7 +617,7 @@ def ultimate_train(
         vf_coef=0.5,
         learning_rate=9e-4,  
         n_steps=1024,
-        batch_size=128,
+        batch_size=256,
         n_epochs=10,
         gamma=0.99,
         gae_lambda=0.96,
