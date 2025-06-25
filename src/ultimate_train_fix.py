@@ -232,7 +232,9 @@ class UltimateSafeCallback(BaseCallback):
                 self.axes[1, 1].clear()
                 util_pct = [rate * 100 for rate in self.utilization_rates]
                 self.axes[1, 1].plot(self.eval_timesteps, util_pct, 'purple', linewidth=2, marker='^')
-                self.axes[1, 1].set_ylim(0, 100)
+                # 동적 Y축 설정 (최대값의 110%까지)
+                max_util = max(util_pct) if util_pct else 100
+                self.axes[1, 1].set_ylim(0, max(100, max_util * 1.1))
                 self.axes[1, 1].set_title('Utilization Rate (%)')
                 self.axes[1, 1].grid(True, alpha=0.3)
             
@@ -294,7 +296,9 @@ class UltimateSafeCallback(BaseCallback):
             if self.eval_timesteps and self.utilization_rates:
                 util_pct = [rate * 100 for rate in self.utilization_rates]
                 axes[1, 0].plot(self.eval_timesteps, util_pct, 'purple', linewidth=3, marker='^', markersize=8)
-                axes[1, 0].set_ylim(0, 100)
+                # 동적 Y축 설정 (최대값의 110%까지)
+                max_util = max(util_pct) if util_pct else 100
+                axes[1, 0].set_ylim(0, max(100, max_util * 1.1))
                 axes[1, 0].set_title('Utilization Rate Trend')
                 axes[1, 0].set_xlabel('Steps')
                 axes[1, 0].set_ylabel('Utilization Rate (%)')
@@ -438,7 +442,7 @@ def create_ultimate_gif(model, env, timestamp):
                                 box_count += 1
                         
                         if box_count > 0:
-                            ax.text2D(0.02, 0.98, f'배치된 박스: {box_count}개', 
+                            ax.text2D(0.02, 0.98, f'Placed Boxes: {box_count}', 
                                     transform=ax.transAxes, fontsize=12, 
                                     bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8))
                 except Exception as box_e:
@@ -455,7 +459,7 @@ def create_ultimate_gif(model, env, timestamp):
                     buf.close()
                     
                     if step % 5 == 0:
-                        print(f"  프레임 {step + 1}/30 완료")
+                        print(f"  Frame {step + 1}/30 completed")
                         
                 except Exception as save_e:
                     print(f"⚠️ 프레임 저장 오류 (스텝 {step}): {save_e}")
@@ -468,7 +472,7 @@ def create_ultimate_gif(model, env, timestamp):
                     obs, reward, terminated, truncated, info = gif_env.step(action)
                     
                     if terminated or truncated:
-                        print(f"  에피소드 종료 (스텝 {step + 1})")
+                        print(f"  Episode ended (Step {step + 1})")
                         break
                         
                 except Exception as step_e:
