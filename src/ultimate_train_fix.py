@@ -109,7 +109,7 @@ class UltimateSafeCallback(BaseCallback):
             
             eval_rewards = []
             success_count = 0
-            max_episodes = 5  # 매우 적은 에피소드 
+            max_episodes = 4  # 2:매우 적은 에피소드 
             
             for ep_idx in range(max_episodes):
                 try:
@@ -613,7 +613,7 @@ def ultimate_train(
     model = MaskablePPO(
         "MultiInputPolicy",
         env,
-        ent_coef=0.01,
+        ent_coef=0.05, 
         vf_coef=0.5,
         learning_rate=9e-4,  
         n_steps=1024,
