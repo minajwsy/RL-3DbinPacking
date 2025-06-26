@@ -109,7 +109,7 @@ class UltimateSafeCallback(BaseCallback):
             
             eval_rewards = []
             success_count = 0
-            max_episodes = 4  # 2:매우 적은 에피소드 
+            max_episodes = 8  # 2:매우 적은 에피소드/ 4 → 8로 증가 (더 정확한 평가) 
             
             for ep_idx in range(max_episodes):
                 try:
@@ -120,7 +120,7 @@ class UltimateSafeCallback(BaseCallback):
                     obs, _ = self.eval_env.reset()
                     episode_reward = 0.0
                     step_count = 0
-                    max_steps = 30  # 매우 적은 스텝
+                    max_steps = 50  # 30:매우 적은 스텝/ 30 → 50으로 증가 (충분한 시간)
                     
                     while step_count < max_steps:
                         # 타임아웃 체크
