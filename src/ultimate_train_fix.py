@@ -142,7 +142,8 @@ class UltimateSafeCallback(BaseCallback):
                             break
                     
                     eval_rewards.append(episode_reward)
-                    if episode_reward > 0:
+                    success_threshold = 3.0  # 보상 3.0 이상을 성공으로 판정
+                    if episode_reward >= success_threshold:
                         success_count += 1
                         
                 except Exception as e:
@@ -773,3 +774,12 @@ if __name__ == "__main__":
         print(f"💾 모델 경로: {results['model_path']}")
     else:
         print("\n❌ 학습 실패") 
+
+# 실제 공간 활용률 계산 로직 추가
+def calculate_real_utilization(env):
+    if hasattr(env.unwrapped, 'container'):
+        placed_volume = sum(box.volume for box in env.unwrapped.container.boxes 
+                          if box.position is not None)
+        container_volume = env.unwrapped.container.volume
+        return placed_volume / container_volume
+    return 0.0
