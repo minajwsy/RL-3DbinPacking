@@ -363,15 +363,17 @@ Evaluation Performance:
         plt.close('all')
 
 def create_ultimate_gif(model, env, timestamp):
-    """개선된 GIF 생성 (matplotlib 기반) - 안전한 환경 처리"""
-    print("🎬 고품질 GIF 생성 중...")
+    """프리미엄 품질 GIF 생성 - 기존 고품질 GIF들과 동일한 수준"""
+    print("🎬 프리미엄 품질 GIF 생성 중...")
     
     try:
         import matplotlib.pyplot as plt
         from matplotlib.patches import Rectangle
         from mpl_toolkits.mplot3d import Axes3D
+        from mpl_toolkits.mplot3d.art3d import Poly3DCollection
         from PIL import Image
         import io
+        import numpy as np
         
         # 환경 상태 확인
         if env is None:
@@ -406,61 +408,135 @@ def create_ultimate_gif(model, env, timestamp):
             gif_env.close()
             return None
         
-        # matplotlib 설정
+        # matplotlib 설정 (고품질)
         plt.ioff()  # 인터랙티브 모드 비활성화
-        fig = plt.figure(figsize=(12, 8))
+        plt.style.use('default')
+        fig = plt.figure(figsize=(16, 12), facecolor='white')  # 더 큰 해상도
         ax = fig.add_subplot(111, projection='3d')
         
-        print(f"🎬 프레임 생성 시작 (최대 30 프레임)")
+        # 색상 팔레트 설정 (더 예쁜 색상들)
+        colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FECA57', 
+                  '#FF9FF3', '#54A0FF', '#5F27CD', '#00D2D3', '#FF9F43',
+                  '#10AC84', '#EE5A24', '#0084FF', '#D63031', '#74B9FF',
+                  '#A29BFE', '#6C5CE7', '#FD79A8', '#FDCB6E', '#E17055']
         
-        for step in range(30):  # 프레임 수 줄임 (안정성 향상)
+        print(f"🎬 프레임 생성 시작 (최대 50 프레임)")
+        total_reward = 0
+        
+        for step in range(50):  # 더 많은 프레임
             try:
                 # 현재 상태 시각화
                 ax.clear()
+                
+                # 축 범위 및 라벨 설정
                 ax.set_xlim(0, 10)
                 ax.set_ylim(0, 10)
                 ax.set_zlim(0, 10)
-                ax.set_xlabel('X')
-                ax.set_ylabel('Y')
-                ax.set_zlabel('Z')
-                ax.set_title(f'3D Bin Packing - Step {step}', fontsize=14)
+                ax.set_xlabel('X-axis (Width)', fontsize=12, fontweight='bold')
+                ax.set_ylabel('Y-axis (Depth)', fontsize=12, fontweight='bold')
+                ax.set_zlabel('Z-axis (Height)', fontsize=12, fontweight='bold')
                 
-                # 컨테이너 그리기
-                container_color = 'lightblue'
-                ax.bar3d(0, 0, 0, 10, 10, 0.1, color=container_color, alpha=0.3)
+                # 컨테이너 외곽선 그리기 (더 명확하게)
+                container_edges = [
+                    # 바닥면
+                    [(0,0,0), (10,0,0), (10,10,0), (0,10,0)],
+                    # 윗면
+                    [(0,0,10), (10,0,10), (10,10,10), (0,10,10)],
+                    # 측면들
+                    [(0,0,0), (0,0,10), (0,10,10), (0,10,0)],
+                    [(10,0,0), (10,0,10), (10,10,10), (10,10,0)],
+                    [(0,0,0), (10,0,0), (10,0,10), (0,0,10)],
+                    [(0,10,0), (10,10,0), (10,10,10), (0,10,10)]
+                ]
+                
+                # 컨테이너 외곽선 그리기
+                for face in container_edges:
+                    if face == container_edges[0]:  # 바닥면만 채우기
+                        poly = Poly3DCollection([face], alpha=0.1, facecolor='lightgray', edgecolor='black')
+                        ax.add_collection3d(poly)
+                    else:
+                        poly = Poly3DCollection([face], alpha=0.02, facecolor='lightblue', edgecolor='gray')
+                        ax.add_collection3d(poly)
                 
                 # 박스들 그리기 (환경에서 정보 추출)
+                box_count = 0
+                utilization = 0
+                
                 try:
                     if hasattr(gif_env, 'unwrapped') and hasattr(gif_env.unwrapped, 'container'):
                         container = gif_env.unwrapped.container
-                        box_count = 0
                         for box in container.boxes:
                             if hasattr(box, 'position') and box.position is not None:
                                 x, y, z = box.position
                                 w, h, d = box.size
-                                color = plt.cm.Set3(box_count % 12)
-                                ax.bar3d(x, y, z, w, h, d, color=color, alpha=0.8, edgecolor='black')
+                                
+                                # 박스 색상 선택
+                                color = colors[box_count % len(colors)]
+                                
+                                # 3D 박스 그리기 (6면 모두)
+                                r = [0, w]
+                                s = [0, h] 
+                                t = [0, d]
+                                
+                                # 박스의 8개 꼭짓점 계산
+                                xx, yy, zz = np.meshgrid(r, s, t)
+                                vertices = []
+                                for i in range(2):
+                                    for j in range(2):
+                                        for k in range(2):
+                                            vertices.append([x + xx[i,j,k], y + yy[i,j,k], z + zz[i,j,k]])
+                                
+                                # 박스의 6개 면 정의
+                                faces = [
+                                    [vertices[0], vertices[1], vertices[3], vertices[2]],  # 앞면
+                                    [vertices[4], vertices[5], vertices[7], vertices[6]],  # 뒷면
+                                    [vertices[0], vertices[1], vertices[5], vertices[4]],  # 아래면
+                                    [vertices[2], vertices[3], vertices[7], vertices[6]],  # 윗면
+                                    [vertices[0], vertices[2], vertices[6], vertices[4]],  # 왼쪽면
+                                    [vertices[1], vertices[3], vertices[7], vertices[5]]   # 오른쪽면
+                                ]
+                                
+                                # 면 추가
+                                face_collection = Poly3DCollection(faces, alpha=0.8, facecolor=color, edgecolor='black', linewidth=1)
+                                ax.add_collection3d(face_collection)
+                                
+                                # 박스 라벨 추가
+                                ax.text(x + w/2, y + h/2, z + d/2, f'{box_count+1}', 
+                                       fontsize=10, fontweight='bold', ha='center', va='center')
+                                
                                 box_count += 1
+                                utilization += w * h * d
                         
-                        if box_count > 0:
-                            ax.text2D(0.02, 0.98, f'Placed Boxes: {box_count}', 
-                                    transform=ax.transAxes, fontsize=12, 
-                                    bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8))
+                        # 활용률 계산 (컨테이너 부피: 10*10*10 = 1000)
+                        utilization_percent = (utilization / 1000) * 100
+                        
                 except Exception as box_e:
                     print(f"⚠️ 박스 렌더링 오류 (스텝 {step}): {box_e}")
                 
-                # 프레임 저장 (안전한 방법)
+                # 제목 및 정보 표시
+                ax.set_title(f'Real-time Training Performance Monitoring\n'
+                           f'Step: {step+1}/50 | Placed Boxes: {box_count} | Utilization: {utilization_percent:.1f}%', 
+                           fontsize=14, fontweight='bold', pad=20)
+                
+                # 카메라 각도 설정 (더 좋은 시야각)
+                ax.view_init(elev=25, azim=45 + step * 2)  # 회전 효과
+                
+                # 그리드 설정
+                ax.grid(True, alpha=0.3)
+                ax.set_facecolor('white')
+                
+                # 프레임 저장 (고품질)
                 try:
                     buf = io.BytesIO()
-                    plt.savefig(buf, format='png', dpi=100, bbox_inches='tight', 
-                              facecolor='white', edgecolor='none')
+                    plt.savefig(buf, format='png', dpi=150, bbox_inches='tight', 
+                              facecolor='white', edgecolor='none', pad_inches=0.1)
                     buf.seek(0)
-                    frame = Image.open(buf).copy()  # 복사본 생성
+                    frame = Image.open(buf).copy()
                     frames.append(frame)
                     buf.close()
                     
-                    if step % 5 == 0:
-                        print(f"  Frame {step + 1}/30 completed")
+                    if step % 10 == 0:
+                        print(f"  Frame {step + 1}/50 completed (Boxes: {box_count})")
                         
                 except Exception as save_e:
                     print(f"⚠️ 프레임 저장 오류 (스텝 {step}): {save_e}")
@@ -471,9 +547,13 @@ def create_ultimate_gif(model, env, timestamp):
                     action_masks = get_action_masks(gif_env)
                     action, _ = model.predict(obs, action_masks=action_masks, deterministic=True)
                     obs, reward, terminated, truncated, info = gif_env.step(action)
+                    total_reward += reward
                     
                     if terminated or truncated:
-                        print(f"  Episode ended (Step {step + 1})")
+                        print(f"  Episode ended (Step {step + 1}, Total Reward: {total_reward:.2f})")
+                        # 마지막 프레임 몇 개 더 추가 (결과 확인용)
+                        for _ in range(3):
+                            frames.append(frame.copy())
                         break
                         
                 except Exception as step_e:
@@ -488,27 +568,40 @@ def create_ultimate_gif(model, env, timestamp):
         plt.close(fig)
         gif_env.close()
         
-        # GIF 저장
-        if len(frames) >= 3:  # 최소 3 프레임 이상
+        # GIF 저장 (고품질)
+        if len(frames) >= 5:  # 최소 5 프레임 이상
             try:
                 gif_path = f'gifs/ultimate_demo_{timestamp}.gif'
                 os.makedirs('gifs', exist_ok=True)
                 
-                frames[0].save(
-                    gif_path,
-                    save_all=True,
-                    append_images=frames[1:],
-                    duration=800,  # 0.8초 간격 (더 느리게)
-                    loop=0
-                )
-                
-                # 파일 크기 확인
-                file_size = os.path.getsize(gif_path)
-                print(f"🎬 GIF 저장 완료: {gif_path}")
-                print(f"  📊 프레임 수: {len(frames)}")
-                print(f"  📏 파일 크기: {file_size / 1024:.1f} KB")
-                
-                return gif_path
+                # 프레임 크기 통일
+                if frames:
+                    base_size = frames[0].size
+                    normalized_frames = []
+                    for frame in frames:
+                        if frame.size != base_size:
+                            frame = frame.resize(base_size, Image.LANCZOS)
+                        normalized_frames.append(frame)
+                    
+                    # 고품질 GIF 저장
+                    normalized_frames[0].save(
+                        gif_path,
+                        save_all=True,
+                        append_images=normalized_frames[1:],
+                        duration=600,  # 0.6초 간격 (더 부드럽게)
+                        loop=0,
+                        optimize=True
+                    )
+                    
+                    # 파일 크기 확인
+                    file_size = os.path.getsize(gif_path)
+                    print(f"🎬 프리미엄 GIF 저장 완료: {gif_path}")
+                    print(f"  📊 프레임 수: {len(normalized_frames)}")
+                    print(f"  📏 파일 크기: {file_size / 1024:.1f} KB")
+                    print(f"  🎯 최종 보상: {total_reward:.2f}")
+                    print(f"  📦 배치된 박스: {box_count}개")
+                    
+                    return gif_path
                 
             except Exception as save_e:
                 print(f"❌ GIF 파일 저장 오류: {save_e}")
