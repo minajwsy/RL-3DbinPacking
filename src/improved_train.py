@@ -19,8 +19,8 @@ def improved_experiment_suite():
     # 실험 1: 현재 성과 기준 더 긴 학습
     print("\n📈 실험 1: 장기 학습 (50,000 스텝)")
     ultimate_train(
-        timesteps=50000,
-        eval_freq=8000,
+        timesteps=30000,  # 50000 
+        eval_freq=5000,   # 8000 
         container_size=[10, 10, 10],
         num_boxes=18,
         create_gif=True
@@ -29,8 +29,8 @@ def improved_experiment_suite():
     # 실험 2: 더 도전적인 문제
     print("\n🎯 실험 2: 도전적 문제 (22개 박스)")
     ultimate_train(
-        timesteps=40000,
-        eval_freq=6000,
+        timesteps=30000,   # 40000
+        eval_freq=5000,    # 6000
         container_size=[10, 10, 10],
         num_boxes=22,
         create_gif=True
@@ -39,8 +39,8 @@ def improved_experiment_suite():
     # 실험 3: 다른 컨테이너 형태
     print("\n📦 실험 3: 직육면체 컨테이너")
     ultimate_train(
-        timesteps=35000,
-        eval_freq=5000,
+        timesteps=30000,  # 35000
+        eval_freq=5000,   # 5000
         container_size=[15, 10, 8],
         num_boxes=20,
         create_gif=True
