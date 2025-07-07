@@ -709,10 +709,10 @@ def ultimate_train(
         env,
         ent_coef=0.05, 
         vf_coef=0.5,
-        learning_rate=4e-4,  # 4e-4 / 9e-4  
+        learning_rate=5e-4,  # 4e-4 / 9e-4  
         n_steps=1024,        
-        batch_size=256,      
-        n_epochs=10,
+        batch_size=512,  # 256      
+        n_epochs=15,  # 10
         gamma=0.99,
         gae_lambda=0.95,
         clip_range=0.2,        
