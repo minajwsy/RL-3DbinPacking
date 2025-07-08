@@ -1,4 +1,7 @@
 # 의존성 설치완료 확인
+# venv-setup3of3.sh 실행시 에러 ->가상환경 활성화 상태에서 nptyping 최신 버전으로 업데이트
+uv pip install --upgrade nptyping
+
 echo "=== 의존성 설치완료 확인 중 ==="
 python -c "
 try:
