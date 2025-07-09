@@ -846,6 +846,7 @@ if __name__ == "__main__":
     parser.add_argument("--timesteps", type=int, default=5000, help="총 학습 스텝")
     parser.add_argument("--eval-freq", type=int, default=2000, help="평가 주기")
     parser.add_argument("--num-boxes", type=int, default=16, help="박스 개수")
+    parser.add_argument("--container_size", type=int, default=[10, 10, 10], help="컨테이너 크기"
     parser.add_argument("--no-gif", action="store_true", help="GIF 생성 안함")
     
     args = parser.parse_args()
