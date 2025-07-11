@@ -103,24 +103,24 @@ class UltimateSafeCallback(BaseCallback):
         return True
     
     def _safe_evaluation(self):
-        """타임아웃이 있는 안전한 평가"""
+        """타임아웃이 있는 안전한 평가 -> 평가함수 개선"""
         try:
             print(f"🔍 안전한 평가 시작 (스텝: {self.num_timesteps:,})")
             
             eval_rewards = []
             success_count = 0
-            max_episodes = 8  # 2:매우 적은 에피소드/ 4 → 8로 증가 (더 정확한 평가) 
+            max_episodes = 15  # 8 → 15로 증가 (더 정확한 평가)
             
             for ep_idx in range(max_episodes):
                 try:
                     # 타임아웃 설정
                     eval_start = time.time()
-                    timeout = 30  # 30초 타임아웃
+                    timeout = 60  # 30 → 60초로 증가
                     
                     obs, _ = self.eval_env.reset()
                     episode_reward = 0.0
                     step_count = 0
-                    max_steps = 50  # 30:매우 적은 스텝/ 30 → 50으로 증가 (충분한 시간)
+                    max_steps = 100  # 50 → 100으로 증가 (충분한 시간)
                     
                     while step_count < max_steps:
                         # 타임아웃 체크
@@ -142,7 +142,7 @@ class UltimateSafeCallback(BaseCallback):
                             break
                     
                     eval_rewards.append(episode_reward)
-                    success_threshold = 3.0  # 보상 3.0 이상을 성공으로 판정
+                    success_threshold = 5.0  # 3.0 → 5.0으로 상향 조정
                     if episode_reward >= success_threshold:
                         success_count += 1
                         
