@@ -8,7 +8,7 @@ from stable_baselines3.common.env_util import make_vec_env
 from sb3_contrib.common.maskable.evaluation import evaluate_policy
 from stable_baselines3.common.vec_env.vec_monitor import VecMonitor
 import os
-from src.utils import boxes_generator
+from utils import boxes_generator  #org: src.utils
 
 
 def mask_fn(env: gym.Env) -> NDArray:

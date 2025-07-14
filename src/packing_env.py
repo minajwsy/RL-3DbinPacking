@@ -28,7 +28,7 @@ import plotly.graph_objects as go
 from gymnasium.spaces import Discrete, MultiDiscrete
 from nptyping import NDArray
 
-from src.packing_kernel import Box, Container
+from packing_kernel import Box, Container  #org: src.packing_...
 
 
 class PackingEnv(gym.Env):
@@ -452,7 +452,7 @@ class PackingEnv(gym.Env):
 
 
 if __name__ == "__main__":
-    from src.utils import boxes_generator
+    from utils import boxes_generator  #org: src.utils
     from gymnasium import make
     import warnings
     from plotly_gif import GIF
@@ -480,4 +480,4 @@ if __name__ == "__main__":
             break
 
     gif.create_gif()
-    gif.save_gif("random_rollout.gif")
+    gif.save_gif("random_rollout.gif") 

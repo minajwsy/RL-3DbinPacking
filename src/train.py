@@ -4,7 +4,7 @@ import gymnasium as gym
 from sb3_contrib import MaskablePPO
 from stable_baselines3.common.env_checker import check_env
 
-from src.utils import boxes_generator
+from utils import boxes_generator  #org: src.utils 
 
 from plotly_gif import GIF
 
