@@ -31,18 +31,18 @@ from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.results_plotter import load_results, ts2xy
 
-from src.utils import boxes_generator
-from src.device_utils import setup_training_device, log_system_info, get_device
+from utils import boxes_generator
+from device_utils import setup_training_device, log_system_info, get_device
 
 # 환경 등록 (KAMP 서버에서 패키지 설치 없이 사용하기 위해)
 try:
     import gymnasium as gym
     from gymnasium.envs.registration import register
-    from src.packing_env import PackingEnv
+    from packing_env import PackingEnv
     
     # PackingEnv-v0 환경 등록
     if 'PackingEnv-v0' not in gym.envs.registry:
-        register(id='PackingEnv-v0', entry_point='src.packing_env:PackingEnv')
+        register(id='PackingEnv-v0', entry_point='packing_env:PackingEnv')
         print("✅ PackingEnv-v0 환경 등록 완료")
     else:
         print("✅ PackingEnv-v0 환경 이미 등록됨")
@@ -771,7 +771,7 @@ def make_env(
     def _init():
         try:
             # PackingEnv 환경에 맞는 박스 크기 생성
-            from src.utils import boxes_generator
+            from utils import boxes_generator
             
             # 박스 크기 생성 (num_boxes 개수만큼)
             box_sizes = boxes_generator(

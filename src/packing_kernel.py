@@ -27,7 +27,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from nptyping import NDArray, Int, Shape
 
-from src.utils import (
+from utils import (
     generate_vertices,
     boxes_generator,
     cuboids_intersection,
