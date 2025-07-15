@@ -986,7 +986,7 @@ def create_demonstration_gif(model, env, timestamp):
         def create_matplotlib_visualization(env, step_num=0):
             """matplotlib으로 3D 패킹 상태 시각화"""
             try:
-                container_size = env.container.size
+                container_size = env.unwrapped.container.size
                 
                 # 3D 플롯 생성
                 fig = plt.figure(figsize=(10, 8))
@@ -1022,10 +1022,10 @@ def create_demonstration_gif(model, env, timestamp):
                     ax.plot(edge[0], edge[1], edge[2], 'r-', alpha=0.3)
                 
                 # 배치된 박스들 그리기
-                if hasattr(env, 'packed_boxes') and env.packed_boxes:
-                    colors = plt.cm.Set3(np.linspace(0, 1, len(env.packed_boxes)))
+                if hasattr(env.unwrapped, 'packed_boxes') and env.unwrapped.packed_boxes:
+                    colors = plt.cm.Set3(np.linspace(0, 1, len(env.unwrapped.packed_boxes)))
                     
-                    for idx, box in enumerate(env.packed_boxes):
+                    for idx, box in enumerate(env.unwrapped.packed_boxes):
                         x, y, z = box.position
                         dx, dy, dz = box.size
                         
@@ -1058,7 +1058,7 @@ def create_demonstration_gif(model, env, timestamp):
                 ax.set_zlim(0, container_size[2])
                 
                 # 제목 설정
-                packed_count = len(env.packed_boxes) if hasattr(env, 'packed_boxes') else 0
+                packed_count = len(env.unwrapped.packed_boxes) if hasattr(env.unwrapped, 'packed_boxes') else 0
                 ax.set_title(f'3D Bin Packing - Step {step_num}\n'
                             f'배치된 박스: {packed_count}\n'
                             f'컨테이너 크기: {container_size}', 
