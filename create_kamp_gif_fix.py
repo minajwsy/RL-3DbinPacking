@@ -37,7 +37,7 @@ def visualize_packing_state_matplotlib(env, step_num=0):
     """
     try:
         # 컨테이너 크기 정보 (올바른 속성 사용)
-        container_size = env.container.size
+        container_size = env.unwrapped.container.size
         
         # 3D 플롯 생성
         fig = plt.figure(figsize=(12, 9))
@@ -66,8 +66,8 @@ def visualize_packing_state_matplotlib(env, step_num=0):
                 ax.plot([i, i], [j, j], [0, container_size[2]], 'r-', alpha=0.3)
         
         # 배치된 박스들 그리기
-        if hasattr(env, 'placed_boxes') and env.placed_boxes:
-            colors = plt.cm.Set3(np.linspace(0, 1, len(env.placed_boxes)))
+        if hasattr(env.unwrapped, 'placed_boxes') and env.unwrapped.placed_boxes:
+            colors = plt.cm.Set3(np.linspace(0, 1, len(env.unwrapped.placed_boxes)))
             
             for idx, (pos, size) in enumerate(env.placed_boxes):
                 x, y, z = pos

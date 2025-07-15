@@ -32,7 +32,7 @@ except ImportError as e:
 def create_3d_visualization(env, step_num=0):
     """matplotlib을 사용한 3D 박스 패킹 시각화"""
     try:
-        container_size = env.container.size
+        container_size = env.unwrapped.container.size
         
         # 3D 플롯 생성
         fig = plt.figure(figsize=(12, 9))
@@ -74,11 +74,11 @@ def create_3d_visualization(env, step_num=0):
         
         # 배치된 박스들 그리기
         packed_count = 0
-        if hasattr(env, 'packed_boxes') and env.packed_boxes:
-            packed_count = len(env.packed_boxes)
+        if hasattr(env.unwrapped, 'packed_boxes') and env.unwrapped.packed_boxes:
+            packed_count = len(env.unwrapped.packed_boxes)
             colors = plt.cm.Set3(np.linspace(0, 1, packed_count))
             
-            for idx, box in enumerate(env.packed_boxes):
+            for idx, box in enumerate(env.unwrapped.packed_boxes):
                 x, y, z = box.position
                 dx, dy, dz = box.size
                 
@@ -204,7 +204,7 @@ def generate_gif_from_model(model_path, timestamp):
                 
                 # 진행상황 출력
                 if step_count % 5 == 0:
-                    packed_boxes = len(env.packed_boxes) if hasattr(env, 'packed_boxes') else 0
+                    packed_boxes = len(env.unwrapped.packed_boxes) if hasattr(env.unwrapped, 'packed_boxes') else 0
                     print(f"  Step {step_count}: 보상={reward:.3f}, 누적={total_reward:.3f}, 박스={packed_boxes}")
                     
             except Exception as e:
