@@ -1,0 +1,11 @@
+=== 999 스텝 문제 완전 해결 학습 결과 ===
+timestamp: 20250717_165447
+total_timesteps: 15000
+training_time: 137.67239093780518
+final_reward: 5.8725
+container_size: [10, 10, 10]
+num_boxes: 20
+model_path: models/ultimate_ppo_20250717_165447
+eval_freq: 5000
+callbacks_used: True
+gif_path: gifs/ultimate_demo_20250717_165447.gif
