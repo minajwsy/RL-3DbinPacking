@@ -362,6 +362,152 @@ Evaluation Performance:
         
         plt.close('all')
 
+class UltimateCurriculumCallback(BaseCallback):
+    """
+    999 스텝 문제 없는 안전한 커리큘럼 학습 콜백
+    성공률에 따라 점진적으로 박스 개수(난이도)를 증가시킵니다.
+    """
+    
+    def __init__(
+        self,
+        container_size,
+        initial_boxes,
+        target_boxes,
+        num_visible_boxes,
+        success_threshold=0.6,
+        curriculum_steps=5,
+        patience=5,
+        verbose=1,
+    ):
+        super().__init__(verbose)
+        self.container_size = container_size
+        self.initial_boxes = initial_boxes
+        self.target_boxes = target_boxes
+        self.num_visible_boxes = num_visible_boxes
+        self.success_threshold = success_threshold
+        self.curriculum_steps = curriculum_steps
+        self.patience = patience
+        self.verbose = verbose
+        
+        # 커리큘럼 단계 설정
+        self.current_boxes = initial_boxes
+        self.box_increments = []
+        if target_boxes > initial_boxes:
+            step_size = max(1, (target_boxes - initial_boxes) // curriculum_steps)
+            for i in range(curriculum_steps):
+                next_boxes = initial_boxes + (i + 1) * step_size
+                if next_boxes > target_boxes:
+                    next_boxes = target_boxes
+                self.box_increments.append(next_boxes)
+            # 마지막 단계는 항상 target_boxes
+            if self.box_increments[-1] != target_boxes:
+                self.box_increments.append(target_boxes)
+        
+        # 성과 추적 변수
+        self.evaluation_count = 0
+        self.consecutive_successes = 0
+        self.curriculum_level = 0
+        self.last_success_rate = 0.0
+        self.recent_rewards = []
+        
+        # 안전한 측정을 위한 변수
+        self.measurement_window = 20  # 측정 윈도우 크기
+        self.min_episodes = 10        # 최소 에피소드 수
+        
+        if self.verbose >= 1:
+            print(f"🎓 안전한 커리큘럼 학습 초기화:")
+            print(f"   - 시작 박스 수: {self.initial_boxes}")
+            print(f"   - 목표 박스 수: {self.target_boxes}")
+            print(f"   - 단계별 증가: {self.box_increments}")
+            print(f"   - 성공 임계값: {self.success_threshold}")
+            print(f"   - 측정 윈도우: {self.measurement_window}")
+    
+    def _on_step(self) -> bool:
+        """매 스텝마다 호출 - 안전한 처리"""
+        # 에피소드 완료 체크
+        if self.locals.get('dones', [False])[0]:
+            if 'episode' in self.locals.get('infos', [{}])[0]:
+                episode_info = self.locals['infos'][0]['episode']
+                episode_reward = episode_info['r']
+                
+                # 최근 보상 기록 (안전한 방식)
+                self.recent_rewards.append(episode_reward)
+                
+                # 윈도우 크기 유지
+                if len(self.recent_rewards) > self.measurement_window:
+                    self.recent_rewards.pop(0)
+                
+                # 충분한 데이터가 있을 때만 평가
+                if len(self.recent_rewards) >= self.min_episodes:
+                    self._evaluate_curriculum_progress()
+        
+        return True
+    
+    def _evaluate_curriculum_progress(self):
+        """커리큘럼 진행 상황 평가 (안전한 방식)"""
+        try:
+            # 성공률 계산 (보상 > 0.5인 경우 성공으로 간주)
+            success_count = sum(1 for r in self.recent_rewards if r > 0.5)
+            success_rate = success_count / len(self.recent_rewards)
+            
+            self.last_success_rate = success_rate
+            self.evaluation_count += 1
+            
+            # 성공률이 임계값을 넘으면 난이도 증가 고려
+            if success_rate >= self.success_threshold:
+                self.consecutive_successes += 1
+                
+                # 연속 성공 횟수가 patience를 넘으면 난이도 증가
+                if self.consecutive_successes >= self.patience:
+                    self._increase_difficulty()
+            else:
+                self.consecutive_successes = 0
+                
+        except Exception as e:
+            if self.verbose >= 1:
+                print(f"⚠️ 커리큘럼 평가 오류: {e}")
+    
+    def _increase_difficulty(self):
+        """난이도 증가 (박스 개수 증가) - 안전한 방식"""
+        if self.curriculum_level < len(self.box_increments):
+            new_boxes = self.box_increments[self.curriculum_level]
+            
+            if self.verbose >= 1:
+                print(f"\n🎯 커리큘럼 학습: 난이도 증가!")
+                print(f"   - 이전 박스 수: {self.current_boxes}")
+                print(f"   - 새로운 박스 수: {new_boxes}")
+                print(f"   - 현재 성공률: {self.last_success_rate:.1%}")
+                print(f"   - 연속 성공 횟수: {self.consecutive_successes}")
+                print(f"   - 진행도: {self.curriculum_level + 1}/{len(self.box_increments)}")
+            
+            self.current_boxes = new_boxes
+            self.curriculum_level += 1
+            self.consecutive_successes = 0
+            
+            # 새로운 난이도에서 측정 초기화
+            self.recent_rewards = []
+            
+            # 환경 업데이트는 안전성을 위해 로그만 출력
+            if self.verbose >= 1:
+                print(f"   - 다음 학습 세션에서 {new_boxes}개 박스로 학습 권장")
+                print(f"   - 현재 세션은 안정성을 위해 계속 진행")
+    
+    def get_current_difficulty(self):
+        """현재 난이도 정보 반환"""
+        return {
+            "current_boxes": self.current_boxes,
+            "curriculum_level": self.curriculum_level,
+            "max_level": len(self.box_increments),
+            "success_rate": self.last_success_rate,
+            "consecutive_successes": self.consecutive_successes,
+            "progress_percentage": (self.curriculum_level / len(self.box_increments)) * 100 if self.box_increments else 0,
+            "recommended_boxes": self.current_boxes
+        }
+    
+    def is_curriculum_complete(self):
+        """커리큘럼 완료 여부 확인"""
+        return self.curriculum_level >= len(self.box_increments)
+
 def create_ultimate_gif(model, env, timestamp):
     """프리미엄 품질 GIF 생성 - 기존 고품질 GIF들과 동일한 수준"""
     print("🎬 프리미엄 품질 GIF 생성 중...")
@@ -616,64 +762,34 @@ def create_ultimate_gif(model, env, timestamp):
         traceback.print_exc()
         return None
 
-class CurriculumLearningCallback(BaseCallback):
-    """
-    커리큘럼 학습 콜백 클래스
-    성공률에 따라 점진적으로 박스 개수(난이도)를 증가시킵니다.
-    """
-    
-    def __init__(
-        self,
-        container_size,
-        initial_boxes,
-        target_boxes,
-        num_visible_boxes,
-        success_threshold=0.6,
-        curriculum_steps=5,
-        patience=5,
-        verbose=0,
-    ):
-        super().__init__(verbose)
-        self.container_size = container_size
-        self.initial_boxes = initial_boxes
-        self.target_boxes = target_boxes
-        self.num_visible_boxes = num_visible_boxes
-        self.success_threshold = success_threshold
-        self.curriculum_steps = curriculum_steps
-        self.patience = patience
-        self.verbose = verbose
-        
-        # 커리큘럼 단계 설정
-        self.current_boxes = initial_boxes
-        self.box_increments = []
-        if target_boxes > initial_boxes:
-            step_size = (target_boxes - initial_boxes) // curriculum_steps
-            for i in range(curriculum_steps):
-                next_boxes = initial_boxes + (i + 1) * step_size
-                if next_boxes > target_boxes:
-                    next_boxes = target_boxes
-                self.box_increments.append(next_boxes)
-            # 마지막 단계는 항상 target_boxes
-            if self.box_increments[-1] != target_boxes:
-                self.box_increments.append(target_boxes)
-        
-        # 성과 추적 변수
-        self.evaluation_count = 0
-        self.consecutive_successes = 0
-        self.curriculum_level = 0
-        self.last_success_rate = 0.0
-
 def ultimate_train(
     timesteps=5000,
     eval_freq=2000,
     container_size=[10, 10, 10],
     num_boxes=16,
-    create_gif=True
+    create_gif=True,
+    curriculum_learning=True,
+    initial_boxes=None,
+    success_threshold=0.6,
+    curriculum_steps=5,
+    patience=5
 ):
-    """999 스텝 문제 완전 해결된 학습 함수"""
+    """999 스텝 문제 완전 해결된 학습 함수 (커리큘럼 학습 지원)"""
+    
+    # 커리큘럼 학습 설정
+    if curriculum_learning and initial_boxes is None:
+        initial_boxes = max(8, num_boxes // 2)  # 시작 박스 수 (목표의 절반)
+    elif not curriculum_learning:
+        initial_boxes = num_boxes
+    
+    current_boxes = initial_boxes
     
     print("🚀 999 스텝 문제 완전 해결 학습 시작")
     print(f"📋 설정: {timesteps:,} 스텝, 평가 주기 {eval_freq:,}")
+    if curriculum_learning:
+        print(f"🎓 커리큘럼 학습: {initial_boxes}개 → {num_boxes}개 박스")
+    else:
+        print(f"📦 고정 박스 수: {num_boxes}개")
     
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     
@@ -683,11 +799,11 @@ def ultimate_train(
     os.makedirs('gifs', exist_ok=True)
     os.makedirs('logs', exist_ok=True)
     
-    # 환경 생성 (간단한 설정)
+    # 환경 생성 (커리큘럼 학습 고려)
     print("🏗️ 환경 생성 중...")
     env = make_env(
         container_size=container_size,
-        num_boxes=num_boxes,
+        num_boxes=current_boxes,  # 커리큘럼 학습시 초기 박스 수
         num_visible_boxes=3,
         seed=42,
         render_mode=None,
@@ -699,7 +815,7 @@ def ultimate_train(
     # 평가용 환경
     eval_env = make_env(
         container_size=container_size,
-        num_boxes=num_boxes,
+        num_boxes=current_boxes,  # 커리큘럼 학습시 초기 박스 수
         num_visible_boxes=3,
         seed=43,
         render_mode=None,
@@ -714,16 +830,35 @@ def ultimate_train(
     
     print("✅ 환경 설정 완료")
     print(f"  - 컨테이너: {container_size}")
-    print(f"  - 박스 수: {num_boxes}")
+    print(f"  - 현재 박스 수: {current_boxes}")
+    if curriculum_learning:
+        print(f"  - 최종 목표 박스 수: {num_boxes}")
     print(f"  - 액션 스페이스: {env.action_space}")
     print(f"  - 관찰 스페이스: {env.observation_space}")
     
-    # 안전한 콜백 설정
+    # 안전한 콜백 설정 (커리큘럼 학습 포함)
     print("🛡️ 안전한 콜백 설정 중...")
     
     # 평가 주기가 충분히 큰 경우에만 콜백 사용
     if eval_freq >= 2000:
         safe_callback = UltimateSafeCallback(eval_env, eval_freq=eval_freq)
+        
+        # 커리큘럼 학습 콜백 추가
+        callbacks = [safe_callback]
+        
+        if curriculum_learning:
+            curriculum_callback = UltimateCurriculumCallback(
+                container_size=container_size,
+                initial_boxes=initial_boxes,
+                target_boxes=num_boxes,
+                num_visible_boxes=3,
+                success_threshold=success_threshold,
+                curriculum_steps=curriculum_steps,
+                patience=patience,
+                verbose=1
+            )
+            callbacks.append(curriculum_callback)
+            print(f"🎓 커리큘럼 학습 콜백 추가")
         
         # 체크포인트 콜백 (안전한 설정)
         checkpoint_callback = CheckpointCallback(
@@ -732,12 +867,18 @@ def ultimate_train(
             name_prefix=f"ultimate_model_{timestamp}",
             verbose=1
         )
+        callbacks.append(checkpoint_callback)
         
-        callbacks = [safe_callback, checkpoint_callback]
         print(f"✅ 안전한 콜백 활성화 (평가 주기: {eval_freq})")
+        if curriculum_learning:
+            print(f"   - 커리큘럼 학습 활성화")
+            print(f"   - 성공 임계값: {success_threshold}")
+            print(f"   - 인내심: {patience}")
     else:
         callbacks = None
         print("⚠️ 콜백 비활성화 (평가 주기가 너무 짧음)")
+        if curriculum_learning:
+            print("⚠️ 커리큘럼 학습도 비활성화됨")
     
     # 최적화된 모델 생성
     print("🤖 최적화된 모델 생성 중...")
@@ -889,32 +1030,80 @@ def ultimate_train(
 if __name__ == "__main__":
     import argparse
     
-    parser = argparse.ArgumentParser(description="999 스텝 문제 완전 해결 학습")
-    parser.add_argument("--timesteps", type=int, default=5000, help="총 학습 스텝")
+    parser = argparse.ArgumentParser(description="999 스텝 문제 완전 해결 + 커리큘럼 학습 지원")
+    parser.add_argument("--timesteps", type=int, default=5000, help="총 학습 스텝 수")
     parser.add_argument("--eval-freq", type=int, default=2000, help="평가 주기")
-    parser.add_argument("--num-boxes", type=int, default=16, help="박스 개수")
-    parser.add_argument("--container_size", type=int, nargs='*', default=[10, 10, 10], help="컨테이너 크기")
+    parser.add_argument("--container-size", nargs=3, type=int, default=[10, 10, 10], help="컨테이너 크기")
+    parser.add_argument("--num-boxes", type=int, default=16, help="목표 박스 개수")
     parser.add_argument("--no-gif", action="store_true", help="GIF 생성 안함")
+    
+    # 커리큘럼 학습 옵션
+    parser.add_argument("--curriculum-learning", action="store_true", default=True, 
+                        help="커리큘럼 학습 활성화 (기본값: True)")
+    parser.add_argument("--no-curriculum", action="store_true", 
+                        help="커리큘럼 학습 비활성화")
+    parser.add_argument("--initial-boxes", type=int, default=None, 
+                        help="시작 박스 수 (기본값: 목표의 절반)")
+    parser.add_argument("--success-threshold", type=float, default=0.6, 
+                        help="성공 임계값 (기본값: 0.6)")
+    parser.add_argument("--curriculum-steps", type=int, default=5, 
+                        help="커리큘럼 단계 수 (기본값: 5)")
+    parser.add_argument("--patience", type=int, default=5, 
+                        help="난이도 증가 대기 횟수 (기본값: 5)")
     
     args = parser.parse_args()
     
-    print("🚀 999 스텝 문제 완전 해결 학습 스크립트")
-    print("=" * 50)
+    # 커리큘럼 학습 설정
+    curriculum_learning = args.curriculum_learning and not args.no_curriculum
     
-    model, results = ultimate_train(
-        timesteps=args.timesteps,
-        eval_freq=args.eval_freq,
-        num_boxes=args.num_boxes,
-        create_gif=not args.no_gif
-    )
+    print("🚀 999 스텝 문제 완전 해결 + 커리큘럼 학습 스크립트")
+    print("=" * 60)
     
-    if results:
-        print("\n🎉 학습 성공!")
-        print(f"📊 최종 보상: {results['final_reward']:.4f}")
-        print(f"⏱️ 소요 시간: {results['training_time']:.2f}초")
-        print(f"💾 모델 경로: {results['model_path']}")
+    if curriculum_learning:
+        print("🎓 커리큘럼 학습 모드 활성화")
+        print(f"   - 성공 임계값: {args.success_threshold}")
+        print(f"   - 커리큘럼 단계: {args.curriculum_steps}")
+        print(f"   - 인내심: {args.patience}")
     else:
-        print("\n❌ 학습 실패") 
+        print("📦 고정 난이도 모드")
+    
+    try:
+        model, results = ultimate_train(
+            timesteps=args.timesteps,
+            eval_freq=args.eval_freq,
+            container_size=args.container_size,
+            num_boxes=args.num_boxes,
+            create_gif=not args.no_gif,
+            curriculum_learning=curriculum_learning,
+            initial_boxes=args.initial_boxes,
+            success_threshold=args.success_threshold,
+            curriculum_steps=args.curriculum_steps,
+            patience=args.patience
+        )
+        
+        if results:
+            print("\n🎉 학습 성공!")
+            print(f"📊 최종 보상: {results['final_reward']:.4f}")
+            print(f"⏱️ 소요 시간: {results['training_time']:.2f}초")
+            print(f"💾 모델 경로: {results['model_path']}")
+            
+            # 커리큘럼 학습 결과 출력
+            if curriculum_learning and 'curriculum_info' in results:
+                curriculum_info = results['curriculum_info']
+                print(f"\n🎓 커리큘럼 학습 결과:")
+                print(f"   - 최종 박스 수: {curriculum_info['current_boxes']}")
+                print(f"   - 진행도: {curriculum_info['curriculum_level']}/{curriculum_info['max_level']}")
+                print(f"   - 최종 성공률: {curriculum_info['success_rate']:.1%}")
+                print(f"   - 완료 여부: {'✅ 완료' if curriculum_info['progress_percentage'] >= 100 else '⏳ 진행 중'}")
+        else:
+            print("\n❌ 학습 실패")
+            
+    except KeyboardInterrupt:
+        print("\n⏹️ 사용자에 의해 중단됨")
+    except Exception as e:
+        print(f"\n❌ 전체 오류: {e}")
+        import traceback
+        traceback.print_exc()
 
 # 실제 공간 활용률 계산 로직 추가
 def calculate_real_utilization(env):
