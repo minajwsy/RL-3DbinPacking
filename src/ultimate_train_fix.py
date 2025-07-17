@@ -616,6 +616,53 @@ def create_ultimate_gif(model, env, timestamp):
         traceback.print_exc()
         return None
 
+class CurriculumLearningCallback(BaseCallback):
+    """
+    커리큘럼 학습 콜백 클래스
+    성공률에 따라 점진적으로 박스 개수(난이도)를 증가시킵니다.
+    """
+    
+    def __init__(
+        self,
+        container_size,
+        initial_boxes,
+        target_boxes,
+        num_visible_boxes,
+        success_threshold=0.6,
+        curriculum_steps=5,
+        patience=5,
+        verbose=0,
+    ):
+        super().__init__(verbose)
+        self.container_size = container_size
+        self.initial_boxes = initial_boxes
+        self.target_boxes = target_boxes
+        self.num_visible_boxes = num_visible_boxes
+        self.success_threshold = success_threshold
+        self.curriculum_steps = curriculum_steps
+        self.patience = patience
+        self.verbose = verbose
+        
+        # 커리큘럼 단계 설정
+        self.current_boxes = initial_boxes
+        self.box_increments = []
+        if target_boxes > initial_boxes:
+            step_size = (target_boxes - initial_boxes) // curriculum_steps
+            for i in range(curriculum_steps):
+                next_boxes = initial_boxes + (i + 1) * step_size
+                if next_boxes > target_boxes:
+                    next_boxes = target_boxes
+                self.box_increments.append(next_boxes)
+            # 마지막 단계는 항상 target_boxes
+            if self.box_increments[-1] != target_boxes:
+                self.box_increments.append(target_boxes)
+        
+        # 성과 추적 변수
+        self.evaluation_count = 0
+        self.consecutive_successes = 0
+        self.curriculum_level = 0
+        self.last_success_rate = 0.0
+
 def ultimate_train(
     timesteps=5000,
     eval_freq=2000,
