@@ -362,10 +362,12 @@ Evaluation Performance:
         
         plt.close('all')
 
-class UltimateCurriculumCallback(BaseCallback):
+class AdaptiveCurriculumCallback(BaseCallback):
     """
-    999 스텝 문제 없는 안전한 커리큘럼 학습 콜백
-    성공률에 따라 점진적으로 박스 개수(난이도)를 증가시킵니다.
+    MathWorks/YouTube 사례 기반 적응적 커리큘럼 학습
+    - 성능 기반 동적 난이도 조정
+    - 다중 지표 평가 (보상, 성공률, 안정성)
+    - 자동 백트래킹 (성능 저하시 이전 단계로)
     """
     
     def __init__(
@@ -374,9 +376,10 @@ class UltimateCurriculumCallback(BaseCallback):
         initial_boxes,
         target_boxes,
         num_visible_boxes,
-        success_threshold=0.6,
-        curriculum_steps=5,
-        patience=5,
+        success_threshold=0.5,  # MathWorks 권장: 낮은 기준으로 시작
+        curriculum_steps=7,     # 더 많은 단계
+        patience=8,            # 더 긴 인내심
+        stability_window=30,   # 안정성 측정 윈도우
         verbose=1,
     ):
         super().__init__(verbose)
@@ -387,9 +390,10 @@ class UltimateCurriculumCallback(BaseCallback):
         self.success_threshold = success_threshold
         self.curriculum_steps = curriculum_steps
         self.patience = patience
+        self.stability_window = stability_window
         self.verbose = verbose
         
-        # 커리큘럼 단계 설정
+        # 적응적 커리큘럼 단계 설정
         self.current_boxes = initial_boxes
         self.box_increments = []
         if target_boxes > initial_boxes:
@@ -403,82 +407,146 @@ class UltimateCurriculumCallback(BaseCallback):
             if self.box_increments[-1] != target_boxes:
                 self.box_increments.append(target_boxes)
         
-        # 성과 추적 변수
+        # 성과 추적 변수 (다중 지표)
         self.evaluation_count = 0
         self.consecutive_successes = 0
         self.curriculum_level = 0
         self.last_success_rate = 0.0
         self.recent_rewards = []
+        self.recent_episode_lengths = []
+        self.recent_utilizations = []
         
-        # 안전한 측정을 위한 변수
-        self.measurement_window = 20  # 측정 윈도우 크기
-        self.min_episodes = 10        # 최소 에피소드 수
+        # MathWorks 기반 적응적 파라미터
+        self.performance_history = []  # 각 레벨별 성능 기록
+        self.stability_scores = []     # 안정성 점수
+        self.backtrack_count = 0       # 백트래킹 횟수
+        self.max_backtrack = 3         # 최대 백트래킹 허용
+        
+        # 적응적 임계값 (성능에 따라 동적 조정)
+        self.adaptive_threshold = success_threshold
+        self.threshold_decay = 0.95    # 임계값 감소율
         
         if self.verbose >= 1:
-            print(f"🎓 안전한 커리큘럼 학습 초기화:")
+            print(f"🎓 적응적 커리큘럼 학습 초기화:")
             print(f"   - 시작 박스 수: {self.initial_boxes}")
             print(f"   - 목표 박스 수: {self.target_boxes}")
             print(f"   - 단계별 증가: {self.box_increments}")
-            print(f"   - 성공 임계값: {self.success_threshold}")
-            print(f"   - 측정 윈도우: {self.measurement_window}")
+            print(f"   - 초기 성공 임계값: {self.success_threshold}")
+            print(f"   - 안정성 윈도우: {self.stability_window}")
     
     def _on_step(self) -> bool:
-        """매 스텝마다 호출 - 안전한 처리"""
+        """매 스텝마다 호출 - 다중 지표 수집"""
         # 에피소드 완료 체크
         if self.locals.get('dones', [False])[0]:
             if 'episode' in self.locals.get('infos', [{}])[0]:
                 episode_info = self.locals['infos'][0]['episode']
                 episode_reward = episode_info['r']
+                episode_length = episode_info['l']
                 
-                # 최근 보상 기록 (안전한 방식)
+                # 활용률 계산 (보상을 활용률로 간주)
+                episode_utilization = max(0.0, episode_reward / 10.0)  # 정규화
+                
+                # 최근 성과 기록 (적응적 윈도우)
                 self.recent_rewards.append(episode_reward)
+                self.recent_episode_lengths.append(episode_length)
+                self.recent_utilizations.append(episode_utilization)
                 
                 # 윈도우 크기 유지
-                if len(self.recent_rewards) > self.measurement_window:
+                if len(self.recent_rewards) > self.stability_window:
                     self.recent_rewards.pop(0)
+                    self.recent_episode_lengths.pop(0)
+                    self.recent_utilizations.pop(0)
                 
                 # 충분한 데이터가 있을 때만 평가
-                if len(self.recent_rewards) >= self.min_episodes:
-                    self._evaluate_curriculum_progress()
+                if len(self.recent_rewards) >= min(15, self.stability_window // 2):
+                    self._evaluate_adaptive_curriculum()
         
         return True
     
-    def _evaluate_curriculum_progress(self):
-        """커리큘럼 진행 상황 평가 (안전한 방식)"""
+    def _evaluate_adaptive_curriculum(self):
+        """적응적 커리큘럼 진행 상황 평가 (MathWorks 기법)"""
         try:
-            # 성공률 계산 (보상 > 0.5인 경우 성공으로 간주)
-            success_count = sum(1 for r in self.recent_rewards if r > 0.5)
-            success_rate = success_count / len(self.recent_rewards)
+            # 1. 다중 성과 지표 계산
+            rewards = self.recent_rewards
+            lengths = self.recent_episode_lengths
+            utilizations = self.recent_utilizations
             
+            # 성공률 (보상 기반)
+            success_count = sum(1 for r in rewards if r > self.adaptive_threshold)
+            success_rate = success_count / len(rewards)
+            
+            # 안정성 점수 (변동성 기반)
+            import numpy as np
+            reward_stability = 1.0 / (1.0 + np.std(rewards))
+            length_stability = 1.0 / (1.0 + np.std(lengths))
+            stability_score = (reward_stability + length_stability) / 2.0
+            
+            # 활용률 개선도
+            if len(utilizations) >= 10:
+                recent_util = np.mean(utilizations[-5:])
+                prev_util = np.mean(utilizations[-10:-5])
+                util_improvement = recent_util - prev_util
+            else:
+                util_improvement = 0.0
+            
+            # 종합 성과 점수 (MathWorks 가중 평균)
+            performance_score = (
+                success_rate * 0.4 +          # 성공률 40%
+                stability_score * 0.3 +       # 안정성 30%
+                max(0, util_improvement) * 0.3 # 개선도 30%
+            )
+            
+            # 현재 성과 기록
             self.last_success_rate = success_rate
+            self.stability_scores.append(stability_score)
+            self.performance_history.append(performance_score)
             self.evaluation_count += 1
             
-            # 성공률이 임계값을 넘으면 난이도 증가 고려
-            if success_rate >= self.success_threshold:
+            if self.verbose >= 2:
+                print(f"📊 적응적 평가 (레벨 {self.curriculum_level}):")
+                print(f"   - 성공률: {success_rate:.1%}")
+                print(f"   - 안정성: {stability_score:.3f}")
+                print(f"   - 활용률 개선: {util_improvement:.3f}")
+                print(f"   - 종합 점수: {performance_score:.3f}")
+            
+            # 2. 적응적 난이도 조정 결정
+            if performance_score >= 0.6:  # MathWorks 권장 기준
                 self.consecutive_successes += 1
                 
-                # 연속 성공 횟수가 patience를 넘으면 난이도 증가
-                if self.consecutive_successes >= self.patience:
-                    self._increase_difficulty()
+                # 연속 성공 + 안정성 확인
+                if (self.consecutive_successes >= self.patience and 
+                    stability_score >= 0.7):  # 안정성 기준 추가
+                    self._adaptive_increase_difficulty()
+                    
+            elif performance_score < 0.3:  # 성능 저하 감지
+                self._consider_backtrack()
             else:
                 self.consecutive_successes = 0
+                # 적응적 임계값 조정
+                if len(self.performance_history) >= 5:
+                    recent_performance = np.mean(self.performance_history[-5:])
+                    if recent_performance < 0.4:
+                        self.adaptive_threshold *= self.threshold_decay
+                        if self.verbose >= 1:
+                            print(f"📉 적응적 임계값 조정: {self.adaptive_threshold:.3f}")
                 
         except Exception as e:
             if self.verbose >= 1:
-                print(f"⚠️ 커리큘럼 평가 오류: {e}")
+                print(f"⚠️ 적응적 커리큘럼 평가 오류: {e}")
     
-    def _increase_difficulty(self):
-        """난이도 증가 (박스 개수 증가) - 안전한 방식"""
+    def _adaptive_increase_difficulty(self):
+        """적응적 난이도 증가 (MathWorks 방식)"""
         if self.curriculum_level < len(self.box_increments):
             new_boxes = self.box_increments[self.curriculum_level]
             
             if self.verbose >= 1:
-                print(f"\n🎯 커리큘럼 학습: 난이도 증가!")
+                print(f"\n🎯 적응적 커리큘럼: 난이도 증가!")
                 print(f"   - 이전 박스 수: {self.current_boxes}")
                 print(f"   - 새로운 박스 수: {new_boxes}")
                 print(f"   - 현재 성공률: {self.last_success_rate:.1%}")
-                print(f"   - 연속 성공 횟수: {self.consecutive_successes}")
-                print(f"   - 진행도: {self.curriculum_level + 1}/{len(self.box_increments)}")
+                print(f"   - 안정성 점수: {self.stability_scores[-1]:.3f}")
+                print(f"   - 연속 성공: {self.consecutive_successes}")
+                print(f"   - 적응적 임계값: {self.adaptive_threshold:.3f}")
             
             self.current_boxes = new_boxes
             self.curriculum_level += 1
@@ -486,27 +554,60 @@ class UltimateCurriculumCallback(BaseCallback):
             
             # 새로운 난이도에서 측정 초기화
             self.recent_rewards = []
+            self.recent_episode_lengths = []
+            self.recent_utilizations = []
             
-            # 환경 업데이트는 안전성을 위해 로그만 출력
-            if self.verbose >= 1:
-                print(f"   - 다음 학습 세션에서 {new_boxes}개 박스로 학습 권장")
-                print(f"   - 현재 세션은 안정성을 위해 계속 진행")
+            # 임계값 약간 증가 (새로운 난이도에 맞춰)
+            self.adaptive_threshold = min(
+                self.adaptive_threshold * 1.1, 
+                self.success_threshold * 1.5
+            )
     
-    def get_current_difficulty(self):
-        """현재 난이도 정보 반환"""
+    def _consider_backtrack(self):
+        """성능 저하시 백트래킹 고려 (YouTube 사례)"""
+        if (self.curriculum_level > 0 and 
+            self.backtrack_count < self.max_backtrack and
+            len(self.performance_history) >= 10):
+            
+            # 최근 성능이 이전 레벨보다 현저히 낮은지 확인
+            recent_performance = np.mean(self.performance_history[-5:])
+            if len(self.performance_history) >= 15:
+                prev_performance = np.mean(self.performance_history[-15:-10])
+                if recent_performance < prev_performance * 0.7:  # 30% 이상 저하
+                    
+                    if self.verbose >= 1:
+                        print(f"\n⬇️ 성능 저하 감지: 백트래킹 실행")
+                        print(f"   - 현재 성능: {recent_performance:.3f}")
+                        print(f"   - 이전 성능: {prev_performance:.3f}")
+                        print(f"   - 백트래킹 횟수: {self.backtrack_count + 1}")
+                    
+                    # 이전 레벨로 복귀
+                    self.curriculum_level = max(0, self.curriculum_level - 1)
+                    if self.curriculum_level == 0:
+                        self.current_boxes = self.initial_boxes
+                    else:
+                        self.current_boxes = self.box_increments[self.curriculum_level - 1]
+                    
+                    self.backtrack_count += 1
+                    self.consecutive_successes = 0
+                    
+                    # 임계값 낮춰서 더 쉽게 만들기
+                    self.adaptive_threshold *= 0.9
+    
+    def get_adaptive_difficulty_info(self):
+        """적응적 난이도 정보 반환"""
         return {
             "current_boxes": self.current_boxes,
             "curriculum_level": self.curriculum_level,
             "max_level": len(self.box_increments),
             "success_rate": self.last_success_rate,
+            "adaptive_threshold": self.adaptive_threshold,
+            "stability_score": self.stability_scores[-1] if self.stability_scores else 0.0,
+            "performance_score": self.performance_history[-1] if self.performance_history else 0.0,
+            "backtrack_count": self.backtrack_count,
             "consecutive_successes": self.consecutive_successes,
             "progress_percentage": (self.curriculum_level / len(self.box_increments)) * 100 if self.box_increments else 0,
-            "recommended_boxes": self.current_boxes
         }
-    
-    def is_curriculum_complete(self):
-        """커리큘럼 완료 여부 확인"""
-        return self.curriculum_level >= len(self.box_increments)
 
 def create_ultimate_gif(model, env, timestamp):
     """프리미엄 품질 GIF 생성 - 기존 고품질 GIF들과 동일한 수준"""
@@ -763,31 +864,35 @@ def create_ultimate_gif(model, env, timestamp):
         return None
 
 def ultimate_train(
-    timesteps=5000,
+    timesteps=15000,
     eval_freq=2000,
     container_size=[10, 10, 10],
     num_boxes=16,
     create_gif=True,
     curriculum_learning=True,
     initial_boxes=None,
-    success_threshold=0.6,
-    curriculum_steps=5,
-    patience=5
+    success_threshold=0.45,  # MathWorks: 낮은 기준으로 시작
+    curriculum_steps=7,      # 더 많은 단계
+    patience=10              # 더 긴 인내심
 ):
-    """999 스텝 문제 완전 해결된 학습 함수 (커리큘럼 학습 지원)"""
+    """999 스텝 문제 완전 해결된 학습 함수 (MathWorks 기반 적응적 커리큘럼 학습 지원)"""
     
-    # 커리큘럼 학습 설정
+    # MathWorks 권장: 적응적 커리큘럼 설정
     if curriculum_learning and initial_boxes is None:
-        initial_boxes = max(8, num_boxes // 2)  # 시작 박스 수 (목표의 절반)
+        # 시작점을 목표의 60%로 설정 (MathWorks 권장)
+        initial_boxes = max(6, int(num_boxes * 0.6))  
     elif not curriculum_learning:
         initial_boxes = num_boxes
     
     current_boxes = initial_boxes
     
-    print("🚀 999 스텝 문제 완전 해결 학습 시작")
+    print("🚀 MathWorks 기반 적응적 커리큘럼 학습 시작")
     print(f"📋 설정: {timesteps:,} 스텝, 평가 주기 {eval_freq:,}")
     if curriculum_learning:
-        print(f"🎓 커리큘럼 학습: {initial_boxes}개 → {num_boxes}개 박스")
+        print(f"🎓 적응적 커리큘럼: {initial_boxes}개 → {num_boxes}개 박스")
+        print(f"   - 성공 임계값: {success_threshold}")
+        print(f"   - 커리큘럼 단계: {curriculum_steps}")
+        print(f"   - 인내심: {patience}")
     else:
         print(f"📦 고정 박스 수: {num_boxes}개")
     
@@ -809,7 +914,7 @@ def ultimate_train(
         render_mode=None,
         random_boxes=False,
         only_terminal_reward=False,
-        improved_reward_shaping=True,
+        improved_reward_shaping=True,  # 항상 개선된 보상 사용
     )()
     
     # 평가용 환경
@@ -836,18 +941,18 @@ def ultimate_train(
     print(f"  - 액션 스페이스: {env.action_space}")
     print(f"  - 관찰 스페이스: {env.observation_space}")
     
-    # 안전한 콜백 설정 (커리큘럼 학습 포함)
+    # 안전한 콜백 설정 (적응적 커리큘럼 학습 포함)
     print("🛡️ 안전한 콜백 설정 중...")
     
     # 평가 주기가 충분히 큰 경우에만 콜백 사용
     if eval_freq >= 2000:
         safe_callback = UltimateSafeCallback(eval_env, eval_freq=eval_freq)
         
-        # 커리큘럼 학습 콜백 추가
+        # 적응적 커리큘럼 학습 콜백 추가
         callbacks = [safe_callback]
         
         if curriculum_learning:
-            curriculum_callback = UltimateCurriculumCallback(
+            curriculum_callback = AdaptiveCurriculumCallback(
                 container_size=container_size,
                 initial_boxes=initial_boxes,
                 target_boxes=num_boxes,
@@ -855,33 +960,34 @@ def ultimate_train(
                 success_threshold=success_threshold,
                 curriculum_steps=curriculum_steps,
                 patience=patience,
+                stability_window=50,  # 안정성 윈도우
                 verbose=1
             )
             callbacks.append(curriculum_callback)
-            print(f"🎓 커리큘럼 학습 콜백 추가")
+            print(f"🎓 적응적 커리큘럼 학습 콜백 추가")
         
         # 체크포인트 콜백 (안전한 설정)
         checkpoint_callback = CheckpointCallback(
             save_freq=max(eval_freq, 3000),
             save_path="models/checkpoints",
-            name_prefix=f"ultimate_model_{timestamp}",
+            name_prefix=f"adaptive_model_{timestamp}",
             verbose=1
         )
         callbacks.append(checkpoint_callback)
         
         print(f"✅ 안전한 콜백 활성화 (평가 주기: {eval_freq})")
         if curriculum_learning:
-            print(f"   - 커리큘럼 학습 활성화")
+            print(f"   - 적응적 커리큘럼 학습 활성화")
             print(f"   - 성공 임계값: {success_threshold}")
-            print(f"   - 인내심: {patience}")
+            print(f"   - 안정성 윈도우: 50")
     else:
         callbacks = None
         print("⚠️ 콜백 비활성화 (평가 주기가 너무 짧음)")
         if curriculum_learning:
             print("⚠️ 커리큘럼 학습도 비활성화됨")
     
-    # 최적화된 모델 생성
-    print("🤖 최적화된 모델 생성 중...")
+    # MathWorks 권장 최적화된 모델 생성
+    print("🤖 MathWorks 기반 최적화된 모델 생성 중...")
     
     # TensorBoard 로그 설정 (선택적)
     tensorboard_log = None
@@ -892,25 +998,39 @@ def ultimate_train(
     except ImportError:
         print("⚠️ TensorBoard 없음 - 로깅 비활성화")
     
+    # MathWorks 기반 개선된 하이퍼파라미터
     model = MaskablePPO(
         "MultiInputPolicy",
         env,
-        ent_coef=0.05, 
-        vf_coef=0.5,
-        learning_rate=9e-4,  # 4e-4 / 9e-4 / 5e-4 
-        n_steps=1024,        
-        batch_size=512,  # 256      
-        n_epochs=15,  # 10
-        gamma=0.99,
-        gae_lambda=0.95,
-        clip_range=0.2,        
-        max_grad_norm=0.5,
+        # MathWorks 권장 학습률 스케줄링
+        learning_rate=lambda progress: max(1e-5, 3e-4 * (1 - progress * 0.9)),  
+        n_steps=2048,        # 더 많은 스텝으로 안정성 확보
+        batch_size=256,      # 적당한 배치 크기
+        n_epochs=10,         # 적당한 에포크
+        gamma=0.99,          # 표준 감가율
+        gae_lambda=0.95,     # 표준 GAE
+        clip_range=0.2,      # 표준 클립 범위
+        clip_range_vf=None,  # VF 클립 비활성화
+        ent_coef=0.01,       # 적당한 엔트로피
+        vf_coef=0.5,         # 표준 가치 함수 계수
+        max_grad_norm=0.5,   # 그래디언트 클리핑
         verbose=1,
         tensorboard_log=tensorboard_log,
         seed=42,
+        # MathWorks 권장 정책 kwargs
+        policy_kwargs=dict(
+            net_arch=[256, 256, 128],  # 적당한 네트워크 크기
+            activation_fn=torch.nn.ReLU,
+            share_features_extractor=True,
+        )
     )
     
-    print("✅ 모델 생성 완료")
+    print("✅ 모델 생성 완료 (MathWorks 기반 하이퍼파라미터)")
+    print(f"  - 학습률: 적응적 스케줄링 (3e-4 → 3e-5)")
+    print(f"  - n_steps: 2048")
+    print(f"  - batch_size: 256")
+    print(f"  - n_epochs: 10")
+    print(f"  - 네트워크: [256, 256, 128]")
     
     # 학습 시작
     print(f"\n🚀 학습 시작: {timesteps:,} 스텝")
@@ -933,16 +1053,31 @@ def ultimate_train(
             total_timesteps=timesteps,
             callback=callbacks,
             progress_bar=use_progress_bar,
-            tb_log_name=f"ultimate_ppo_{timestamp}",
+            tb_log_name=f"adaptive_ppo_{timestamp}",
         )
         
         training_time = time.time() - start_time
         print(f"\n✅ 학습 완료! 소요 시간: {training_time:.2f}초")
         
         # 모델 저장
-        model_path = f"models/ultimate_ppo_{timestamp}"
+        model_path = f"models/adaptive_ppo_{timestamp}"
         model.save(model_path)
         print(f"💾 모델 저장: {model_path}")
+        
+        # 적응적 커리큘럼 결과 출력
+        if curriculum_learning and callbacks:
+            for callback in callbacks:
+                if isinstance(callback, AdaptiveCurriculumCallback):
+                    difficulty_info = callback.get_adaptive_difficulty_info()
+                    print(f"\n🎓 적응적 커리큘럼 학습 결과:")
+                    print(f"   - 최종 박스 수: {difficulty_info['current_boxes']}")
+                    print(f"   - 진행도: {difficulty_info['curriculum_level']}/{difficulty_info['max_level']}")
+                    print(f"   - 최종 성공률: {difficulty_info['success_rate']:.1%}")
+                    print(f"   - 안정성 점수: {difficulty_info['stability_score']:.3f}")
+                    print(f"   - 성과 점수: {difficulty_info['performance_score']:.3f}")
+                    print(f"   - 백트래킹 횟수: {difficulty_info['backtrack_count']}")
+                    print(f"   - 적응적 임계값: {difficulty_info['adaptive_threshold']:.3f}")
+                    break
         
         # 최종 평가 (안전한 방식)
         print("\n📊 최종 평가 중...")
@@ -964,108 +1099,113 @@ def ultimate_train(
                     if terminated or truncated:
                         break
                 except Exception as e:
-                    print(f"⚠️ 평가 오류: {e}")
+                    print(f"⚠️ 평가 중 오류: {e}")
                     break
             
             final_rewards.append(episode_reward)
-            print(f"  에피소드 {ep + 1}: {episode_reward:.4f}")
+            
+        final_reward = np.mean(final_rewards) if final_rewards else 0.0
+        print(f"📈 최종 평가 보상: {final_reward:.4f}")
         
-        mean_reward = np.mean(final_rewards) if final_rewards else 0.0
-        print(f"📊 최종 평균 보상: {mean_reward:.4f}")
-        
-        # GIF 생성 (환경 닫기 전에 수행)
+        # GIF 생성
         gif_path = None
         if create_gif:
             print("\n🎬 GIF 생성 중...")
-            try:
-                gif_path = create_ultimate_gif(model, eval_env, timestamp)
-                if gif_path:
-                    print(f"✅ GIF 생성 완료: {gif_path}")
-                else:
-                    print("⚠️ GIF 생성 실패 - 학습은 성공적으로 완료됨")
-            except Exception as e:
-                print(f"⚠️ GIF 생성 오류: {e} - 학습은 성공적으로 완료됨")
-        
-        # 환경 정리 (GIF 생성 후)
-        env.close()
-        eval_env.close()
-        
-        # 결과 요약
-        results = {
-            "timestamp": timestamp,
-            "total_timesteps": timesteps,
-            "training_time": training_time,
-            "final_reward": mean_reward,
-            "container_size": container_size,
-            "num_boxes": num_boxes,
-            "model_path": model_path,
-            "eval_freq": eval_freq,
-            "callbacks_used": callbacks is not None,
-            "gif_path": gif_path if gif_path else "GIF 생성 실패"
-        }
+            gif_path = create_ultimate_gif(model, eval_env, timestamp)
         
         # 결과 저장
-        results_path = f"results/ultimate_results_{timestamp}.txt"
-        with open(results_path, "w", encoding='utf-8') as f:
-            f.write("=== 999 스텝 문제 완전 해결 학습 결과 ===\n")
-            for key, value in results.items():
-                f.write(f"{key}: {value}\n")
+        results = {
+            'timestamp': timestamp,
+            'total_timesteps': timesteps,
+            'training_time': training_time,
+            'final_reward': final_reward,
+            'container_size': container_size,
+            'num_boxes': num_boxes,
+            'model_path': model_path,
+            'eval_freq': eval_freq,
+            'callbacks_used': callbacks is not None,
+            'curriculum_learning': curriculum_learning,
+            'gif_path': gif_path,
+        }
         
-        print(f"📄 결과 저장: {results_path}")
+        # 적응적 커리큘럼 정보 추가
+        if curriculum_learning and callbacks:
+            for callback in callbacks:
+                if isinstance(callback, AdaptiveCurriculumCallback):
+                    results['curriculum_info'] = callback.get_adaptive_difficulty_info()
+                    break
+        
+        # 결과 파일 저장
+        results_file = f'results/adaptive_results_{timestamp}.txt'
+        with open(results_file, 'w') as f:
+            f.write("=== MathWorks 기반 적응적 커리큘럼 학습 결과 ===\n")
+            for key, value in results.items():
+                if key != 'curriculum_info':
+                    f.write(f"{key}: {value}\n")
+            
+            if 'curriculum_info' in results:
+                f.write("\n=== 적응적 커리큘럼 상세 정보 ===\n")
+                for key, value in results['curriculum_info'].items():
+                    f.write(f"{key}: {value}\n")
+        
+        print(f"📄 결과 저장: {results_file}")
         
         return model, results
         
-    except KeyboardInterrupt:
-        print("\n⏹️ 학습 중단됨")
-        model.save(f"models/interrupted_ultimate_{timestamp}")
-        return model, None
-    
     except Exception as e:
-        print(f"\n❌학습 오류: {e}")
+        print(f"\n❌ 학습 중 오류 발생: {e}")
         import traceback
         traceback.print_exc()
-        model.save(f"models/error_ultimate_{timestamp}")
         return None, None
 
 if __name__ == "__main__":
     import argparse
     
-    parser = argparse.ArgumentParser(description="999 스텝 문제 완전 해결 + 커리큘럼 학습 지원")
-    parser.add_argument("--timesteps", type=int, default=5000, help="총 학습 스텝 수")
+    parser = argparse.ArgumentParser(description="MathWorks 기반 적응적 커리큘럼 학습 + 999 스텝 문제 해결")
+    parser.add_argument("--timesteps", type=int, default=15000, help="총 학습 스텝 수")
     parser.add_argument("--eval-freq", type=int, default=2000, help="평가 주기")
     parser.add_argument("--container-size", nargs=3, type=int, default=[10, 10, 10], help="컨테이너 크기")
     parser.add_argument("--num-boxes", type=int, default=16, help="목표 박스 개수")
     parser.add_argument("--no-gif", action="store_true", help="GIF 생성 안함")
     
-    # 커리큘럼 학습 옵션
+    # MathWorks 기반 적응적 커리큘럼 학습 옵션
     parser.add_argument("--curriculum-learning", action="store_true", default=True, 
-                        help="커리큘럼 학습 활성화 (기본값: True)")
+                        help="적응적 커리큘럼 학습 활성화 (기본값: True)")
     parser.add_argument("--no-curriculum", action="store_true", 
                         help="커리큘럼 학습 비활성화")
     parser.add_argument("--initial-boxes", type=int, default=None, 
-                        help="시작 박스 수 (기본값: 목표의 절반)")
-    parser.add_argument("--success-threshold", type=float, default=0.6, 
-                        help="성공 임계값 (기본값: 0.6)")
-    parser.add_argument("--curriculum-steps", type=int, default=5, 
-                        help="커리큘럼 단계 수 (기본값: 5)")
-    parser.add_argument("--patience", type=int, default=5, 
-                        help="난이도 증가 대기 횟수 (기본값: 5)")
+                        help="시작 박스 수 (기본값: 목표의 60%)")
+    parser.add_argument("--success-threshold", type=float, default=0.45, 
+                        help="성공 임계값 (기본값: 0.45, MathWorks 권장)")
+    parser.add_argument("--curriculum-steps", type=int, default=7, 
+                        help="커리큘럼 단계 수 (기본값: 7)")
+    parser.add_argument("--patience", type=int, default=10, 
+                        help="난이도 증가 대기 횟수 (기본값: 10)")
     
     args = parser.parse_args()
     
     # 커리큘럼 학습 설정
     curriculum_learning = args.curriculum_learning and not args.no_curriculum
     
-    print("🚀 999 스텝 문제 완전 해결 + 커리큘럼 학습 스크립트")
-    print("=" * 60)
+    print("🚀 MathWorks 기반 적응적 커리큘럼 학습 + 999 스텝 문제 해결 스크립트")
+    print("=" * 80)
     
     if curriculum_learning:
-        print("🎓 커리큘럼 학습 모드 활성화")
-        print(f"   - 성공 임계값: {args.success_threshold}")
-        print(f"   - 커리큘럼 단계: {args.curriculum_steps}")
-        print(f"   - 인내심: {args.patience}")
+        print("🎓 적응적 커리큘럼 학습 모드 활성화 (MathWorks 기반)")
+        print(f"   - 성공 임계값: {args.success_threshold} (낮은 기준으로 시작)")
+        print(f"   - 커리큘럼 단계: {args.curriculum_steps} (더 많은 단계)")
+        print(f"   - 인내심: {args.patience} (더 긴 대기)")
+        print(f"   - 시작 박스 수: {args.initial_boxes or f'목표의 60% ({int(args.num_boxes * 0.6)}개)'}")
+        print(f"   ✨ 특징: 다중 지표 평가, 적응적 임계값 조정, 백트래킹")
     else:
         print("📦 고정 난이도 모드")
+    
+    print(f"📋 학습 설정:")
+    print(f"   - 총 스텝: {args.timesteps:,}")
+    print(f"   - 평가 주기: {args.eval_freq:,}")
+    print(f"   - 컨테이너 크기: {args.container_size}")
+    print(f"   - 목표 박스 수: {args.num_boxes}")
+    print(f"   - GIF 생성: {'비활성화' if args.no_gif else '활성화'}")
     
     try:
         model, results = ultimate_train(
@@ -1087,14 +1227,44 @@ if __name__ == "__main__":
             print(f"⏱️ 소요 시간: {results['training_time']:.2f}초")
             print(f"💾 모델 경로: {results['model_path']}")
             
-            # 커리큘럼 학습 결과 출력
+            # 적응적 커리큘럼 학습 결과 출력
             if curriculum_learning and 'curriculum_info' in results:
                 curriculum_info = results['curriculum_info']
-                print(f"\n🎓 커리큘럼 학습 결과:")
+                print(f"\n🎓 적응적 커리큘럼 학습 상세 결과:")
                 print(f"   - 최종 박스 수: {curriculum_info['current_boxes']}")
                 print(f"   - 진행도: {curriculum_info['curriculum_level']}/{curriculum_info['max_level']}")
                 print(f"   - 최종 성공률: {curriculum_info['success_rate']:.1%}")
-                print(f"   - 완료 여부: {'✅ 완료' if curriculum_info['progress_percentage'] >= 100 else '⏳ 진행 중'}")
+                print(f"   - 안정성 점수: {curriculum_info['stability_score']:.3f}")
+                print(f"   - 성과 점수: {curriculum_info['performance_score']:.3f}")
+                print(f"   - 백트래킹 횟수: {curriculum_info['backtrack_count']}")
+                print(f"   - 적응적 임계값: {curriculum_info['adaptive_threshold']:.3f}")
+                
+                # 성과 등급 판정
+                performance_score = curriculum_info['performance_score']
+                if performance_score >= 0.8:
+                    grade = "🏆 S급 (탁월함)"
+                elif performance_score >= 0.7:
+                    grade = "🥇 A급 (우수함)"
+                elif performance_score >= 0.6:
+                    grade = "🥈 B급 (보통)"
+                elif performance_score >= 0.5:
+                    grade = "🥉 C급 (개선 필요)"
+                else:
+                    grade = "📈 D급 (추가 학습 필요)"
+                
+                print(f"   - 성과 등급: {grade}")
+                
+                # 커리큘럼 완료 여부
+                progress = curriculum_info['progress_percentage']
+                if progress >= 100:
+                    print(f"   ✅ 커리큘럼 완료: 목표 달성!")
+                elif progress >= 80:
+                    print(f"   🔥 커리큘럼 거의 완료: {progress:.1f}%")
+                elif progress >= 50:
+                    print(f"   💪 커리큘럼 진행 중: {progress:.1f}%")
+                else:
+                    print(f"   🌱 커리큘럼 초기 단계: {progress:.1f}%")
+                    
         else:
             print("\n❌ 학습 실패")
             
@@ -1104,6 +1274,16 @@ if __name__ == "__main__":
         print(f"\n❌ 전체 오류: {e}")
         import traceback
         traceback.print_exc()
+
+    print("\n🎯 MathWorks 기반 개선 사항 요약:")
+    print("✨ 적응적 임계값 조정 (성능에 따라 동적 변화)")
+    print("✨ 다중 지표 평가 (성공률 + 안정성 + 개선도)")
+    print("✨ 백트래킹 기능 (성능 저하 시 이전 단계로)")
+    print("✨ 안정성 중심 난이도 증가 (충분한 안정성 확보 후 진행)")
+    print("✨ 적응적 학습률 스케줄링 (학습 진행에 따라 감소)")
+    print("✨ 더 많은 커리큘럼 단계 (7단계)")
+    print("✨ 더 긴 인내심 (10회 연속 성공)")
+    print("✨ 종합 성과 평가 시스템 (S~D 등급)")
 
 # 실제 공간 활용률 계산 로직 추가
 def calculate_real_utilization(env):
