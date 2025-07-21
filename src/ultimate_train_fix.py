@@ -13,6 +13,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
 from pathlib import Path
+import torch  # torch import 추가
 
 # 서버 환경 대응
 matplotlib.use('Agg')
