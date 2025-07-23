@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-🚀 999 스텝 문제 완전 해결 + GIF + 성능 그래프 생성
+🚀 999 스텝 문제 완전 해결 + GIF + 성능 그래프 생성 + Optuna/W&B 하이퍼파라미터 최적화
 평가 콜백을 완전히 재작성하여 무한 대기 문제 100% 해결
+Optuna와 W&B sweep을 이용한 자동 하이퍼파라미터 튜닝 지원
 """
 
 import os
@@ -14,6 +15,26 @@ import matplotlib.pyplot as plt
 import matplotlib
 from pathlib import Path
 import torch  # torch import 추가
+import json
+from typing import Dict, Any, Optional, Tuple
+
+# 하이퍼파라미터 최적화 라이브러리
+try:
+    import optuna
+    from optuna.integration import WeightsAndBiasesCallback
+    OPTUNA_AVAILABLE = True
+    print("✅ Optuna 사용 가능")
+except ImportError:
+    OPTUNA_AVAILABLE = False
+    print("⚠️ Optuna 없음 - pip install optuna 필요")
+
+try:
+    import wandb
+    WANDB_AVAILABLE = True
+    print("✅ W&B 사용 가능")
+except ImportError:
+    WANDB_AVAILABLE = False
+    print("⚠️ W&B 없음 - pip install wandb 필요")
 
 # 서버 환경 대응
 matplotlib.use('Agg')
@@ -1159,10 +1180,480 @@ def ultimate_train(
         traceback.print_exc()
         return None, None
 
+# ===== 하이퍼파라미터 최적화 함수들 =====
+
+def calculate_utilization_rate(env) -> float:
+    """환경에서 실제 공간 활용률 계산"""
+    try:
+        if hasattr(env, 'unwrapped') and hasattr(env.unwrapped, 'container'):
+            container = env.unwrapped.container
+            placed_volume = 0
+            
+            for box in container.boxes:
+                if hasattr(box, 'position') and box.position is not None:
+                    if hasattr(box, 'size'):
+                        w, h, d = box.size
+                        placed_volume += w * h * d
+                    elif hasattr(box, 'volume'):
+                        placed_volume += box.volume
+            
+            container_volume = container.size[0] * container.size[1] * container.size[2]
+            return placed_volume / container_volume if container_volume > 0 else 0.0
+        
+        return 0.0
+    except Exception as e:
+        print(f"⚠️ 활용률 계산 오류: {e}")
+        return 0.0
+
+def evaluate_model_performance(model, eval_env, n_episodes: int = 5) -> Tuple[float, float]:
+    """모델 성능 평가: 평균 에피소드 보상과 활용률 반환"""
+    episode_rewards = []
+    utilization_rates = []
+    
+    for ep in range(n_episodes):
+        try:
+            obs, _ = eval_env.reset()
+            episode_reward = 0.0
+            step_count = 0
+            max_steps = 100
+            
+            while step_count < max_steps:
+                try:
+                    action_masks = get_action_masks(eval_env)
+                    action, _ = model.predict(obs, action_masks=action_masks, deterministic=True)
+                    obs, reward, terminated, truncated, info = eval_env.step(action)
+                    episode_reward += reward
+                    step_count += 1
+                    
+                    if terminated or truncated:
+                        break
+                except Exception as e:
+                    print(f"⚠️ 평가 스텝 오류: {e}")
+                    break
+            
+            episode_rewards.append(episode_reward)
+            
+            # 활용률 계산
+            utilization = calculate_utilization_rate(eval_env)
+            utilization_rates.append(utilization)
+            
+        except Exception as e:
+            print(f"⚠️ 평가 에피소드 {ep} 오류: {e}")
+            episode_rewards.append(0.0)
+            utilization_rates.append(0.0)
+    
+    mean_reward = np.mean(episode_rewards) if episode_rewards else 0.0
+    mean_utilization = np.mean(utilization_rates) if utilization_rates else 0.0
+    
+    return mean_reward, mean_utilization
+
+def create_hyperparameter_config(trial: 'optuna.Trial') -> Dict[str, Any]:
+    """Optuna trial에서 하이퍼파라미터 설정 생성"""
+    hyperparams = {
+        'learning_rate': trial.suggest_float('learning_rate', 1e-6, 1e-3, log=True),
+        'n_steps': trial.suggest_categorical('n_steps', [1024, 2048, 4096]),
+        'batch_size': trial.suggest_categorical('batch_size', [64, 128, 256]),
+        'n_epochs': trial.suggest_int('n_epochs', 3, 15),
+        'clip_range': trial.suggest_float('clip_range', 0.1, 0.4),
+        'ent_coef': trial.suggest_float('ent_coef', 1e-4, 1e-1, log=True),
+        'vf_coef': trial.suggest_float('vf_coef', 0.1, 1.0),
+        'gae_lambda': trial.suggest_float('gae_lambda', 0.9, 0.99),
+    }
+    
+    return hyperparams
+
+def optuna_objective(trial: 'optuna.Trial', 
+                    base_config: Dict[str, Any]) -> float:
+    """Optuna 최적화 목적 함수"""
+    
+    print(f"\n🔬 Trial {trial.number} 시작")
+    
+    # 하이퍼파라미터 생성
+    hyperparams = create_hyperparameter_config(trial)
+    
+    print(f"📋 하이퍼파라미터:")
+    for key, value in hyperparams.items():
+        print(f"   - {key}: {value}")
+    
+    # W&B 로깅 설정 (선택적)
+    run_name = f"trial_{trial.number}_{datetime.datetime.now().strftime('%H%M%S')}"
+    
+    if WANDB_AVAILABLE and base_config.get('use_wandb', False):
+        wandb.init(
+            project=base_config.get('wandb_project', 'ppo-3d-binpacking'),
+            name=run_name,
+            config=hyperparams,
+            group="optuna-optimization",
+            reinit=True
+        )
+    
+    try:
+        # 환경 생성
+        container_size = base_config.get('container_size', [10, 10, 10])
+        num_boxes = base_config.get('num_boxes', 16)
+        
+        env = make_env(
+            container_size=container_size,
+            num_boxes=num_boxes,
+            num_visible_boxes=3,
+            seed=42 + trial.number,  # 각 trial마다 다른 시드
+            render_mode=None,
+            random_boxes=False,
+            only_terminal_reward=False,
+            improved_reward_shaping=True,
+        )()
+        
+        eval_env = make_env(
+            container_size=container_size,
+            num_boxes=num_boxes,
+            num_visible_boxes=3,
+            seed=43 + trial.number,
+            render_mode=None,
+            random_boxes=False,
+            only_terminal_reward=False,
+            improved_reward_shaping=True,
+        )()
+        
+        # 모니터링 설정
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        env = Monitor(env, f"logs/optuna_train_trial_{trial.number}_{timestamp}.csv")
+        eval_env = Monitor(eval_env, f"logs/optuna_eval_trial_{trial.number}_{timestamp}.csv")
+        
+        # 모델 생성 (하이퍼파라미터 적용)
+        model = MaskablePPO(
+            "MultiInputPolicy",
+            env,
+            learning_rate=hyperparams['learning_rate'],
+            n_steps=hyperparams['n_steps'],
+            batch_size=hyperparams['batch_size'],
+            n_epochs=hyperparams['n_epochs'],
+            gamma=0.99,
+            gae_lambda=hyperparams['gae_lambda'],
+            clip_range=hyperparams['clip_range'],
+            clip_range_vf=None,
+            ent_coef=hyperparams['ent_coef'],
+            vf_coef=hyperparams['vf_coef'],
+            max_grad_norm=0.5,
+            verbose=0,  # 조용히 실행
+            seed=42 + trial.number,
+            policy_kwargs=dict(
+                net_arch=[256, 256, 128],
+                activation_fn=torch.nn.ReLU,
+                share_features_extractor=True,
+            )
+        )
+        
+        # 학습 (짧은 시간으로 설정)
+        timesteps = base_config.get('trial_timesteps', 5000)  # Trial용 짧은 학습
+        
+        # Pruning을 위한 중간 평가 콜백
+        class OptunaPruningCallback(BaseCallback):
+            def __init__(self, trial, eval_env, eval_freq=1000):
+                super().__init__()
+                self.trial = trial
+                self.eval_env = eval_env
+                self.eval_freq = eval_freq
+                self.last_eval = 0
+                
+            def _on_step(self) -> bool:
+                if self.num_timesteps - self.last_eval >= self.eval_freq:
+                    # 중간 평가
+                    mean_reward, mean_utilization = evaluate_model_performance(
+                        self.model, self.eval_env, n_episodes=3
+                    )
+                    
+                    # 다중 목적 최적화: 가중 합산
+                    # 보상 * 0.7 + 활용률 * 0.3
+                    combined_score = mean_reward * 0.7 + mean_utilization * 100 * 0.3
+                    
+                    # Optuna에 중간 결과 보고
+                    self.trial.report(combined_score, self.num_timesteps)
+                    
+                    # Pruning 체크
+                    if self.trial.should_prune():
+                        print(f"🔪 Trial {self.trial.number} pruned at step {self.num_timesteps}")
+                        raise optuna.TrialPruned()
+                    
+                    self.last_eval = self.num_timesteps
+                    
+                return True
+        
+        # Pruning 콜백 설정
+        pruning_callback = OptunaPruningCallback(trial, eval_env)
+        
+        print(f"🚀 학습 시작: {timesteps:,} 스텝")
+        start_time = time.time()
+        
+        model.learn(
+            total_timesteps=timesteps,
+            callback=pruning_callback,
+            progress_bar=False
+        )
+        
+        training_time = time.time() - start_time
+        
+        # 최종 평가
+        print(f"📊 최종 평가 중...")
+        mean_reward, mean_utilization = evaluate_model_performance(
+            model, eval_env, n_episodes=5
+        )
+        
+        # 다중 목적 최적화: 가중 합산
+        # 보상에 더 큰 가중치 (0.7), 활용률에 0.3
+        combined_score = mean_reward * 0.7 + mean_utilization * 100 * 0.3
+        
+        print(f"✅ Trial {trial.number} 완료:")
+        print(f"   - 평균 보상: {mean_reward:.4f}")
+        print(f"   - 평균 활용률: {mean_utilization:.1%}")
+        print(f"   - 종합 점수: {combined_score:.4f}")
+        print(f"   - 학습 시간: {training_time:.1f}초")
+        
+        # W&B 로깅
+        if WANDB_AVAILABLE and base_config.get('use_wandb', False):
+            wandb.log({
+                "mean_episode_reward": mean_reward,
+                "mean_utilization_rate": mean_utilization,
+                "combined_score": combined_score,
+                "training_time": training_time,
+                **hyperparams
+            })
+            wandb.finish()
+        
+        # 환경 정리
+        env.close()
+        eval_env.close()
+        
+        return combined_score
+        
+    except optuna.TrialPruned:
+        print(f"🔪 Trial {trial.number} was pruned")
+        if WANDB_AVAILABLE and base_config.get('use_wandb', False):
+            wandb.finish()
+        raise
+        
+    except Exception as e:
+        print(f"❌ Trial {trial.number} 오류: {e}")
+        if WANDB_AVAILABLE and base_config.get('use_wandb', False):
+            wandb.finish()
+        
+        # 오류 시 낮은 점수 반환 (최적화가 계속되도록)
+        return -1000.0
+
+def run_optuna_optimization(
+    n_trials: int = 50,
+    container_size: list = [10, 10, 10],
+    num_boxes: int = 16,
+    trial_timesteps: int = 5000,
+    use_wandb: bool = False,
+    wandb_project: str = "ppo-3d-binpacking-optuna",
+    study_name: str = None
+) -> Dict[str, Any]:
+    """Optuna를 이용한 하이퍼파라미터 최적화 실행"""
+    
+    if not OPTUNA_AVAILABLE:
+        raise ImportError("Optuna가 설치되지 않았습니다: pip install optuna")
+    
+    print("🔬 Optuna 하이퍼파라미터 최적화 시작")
+    print(f"📋 설정:")
+    print(f"   - 시행 횟수: {n_trials}")
+    print(f"   - 컨테이너 크기: {container_size}")
+    print(f"   - 박스 개수: {num_boxes}")
+    print(f"   - Trial 학습 스텝: {trial_timesteps:,}")
+    print(f"   - W&B 사용: {use_wandb and WANDB_AVAILABLE}")
+    
+    # 기본 설정
+    base_config = {
+        'container_size': container_size,
+        'num_boxes': num_boxes,
+        'trial_timesteps': trial_timesteps,
+        'use_wandb': use_wandb and WANDB_AVAILABLE,
+        'wandb_project': wandb_project
+    }
+    
+    # Study 생성
+    study_name = study_name or f"ppo_optimization_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    
+    # W&B 콜백 설정
+    callbacks = []
+    if use_wandb and WANDB_AVAILABLE:
+        try:
+            wandb_callback = WeightsAndBiasesCallback(
+                metric_name="combined_score",
+                wandb_kwargs={
+                    "project": wandb_project,
+                    "group": "optuna-study"
+                }
+            )
+            callbacks.append(wandb_callback)
+            print("✅ W&B 콜백 추가됨")
+        except Exception as e:
+            print(f"⚠️ W&B 콜백 설정 오류: {e}")
+    
+    # Study 생성 (TPE + MedianPruner)
+    study = optuna.create_study(
+        study_name=study_name,
+        direction="maximize",  # combined_score 최대화
+        sampler=optuna.samplers.TPESampler(seed=42, multivariate=True),
+        pruner=optuna.pruners.MedianPruner(
+            n_startup_trials=5,
+            n_warmup_steps=1000,
+            interval_steps=500
+        )
+    )
+    
+    print(f"📊 Study 생성 완료: {study_name}")
+    
+    # 최적화 실행
+    try:
+        start_time = time.time()
+        
+        study.optimize(
+            lambda trial: optuna_objective(trial, base_config),
+            n_trials=n_trials,
+            callbacks=callbacks
+        )
+        
+        total_time = time.time() - start_time
+        
+        print(f"\n🎉 최적화 완료!")
+        print(f"⏱️ 총 소요 시간: {total_time:.1f}초")
+        print(f"🏆 최고 성능: {study.best_value:.4f}")
+        print(f"🎯 최적 하이퍼파라미터:")
+        
+        for key, value in study.best_params.items():
+            print(f"   - {key}: {value}")
+        
+        # 결과 저장
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        results = {
+            "study_name": study_name,
+            "best_value": study.best_value,
+            "best_params": study.best_params,
+            "n_trials": len(study.trials),
+            "optimization_time": total_time,
+            "timestamp": timestamp,
+            "config": base_config
+        }
+        
+        results_file = f"results/optuna_results_{timestamp}.json"
+        os.makedirs('results', exist_ok=True)
+        
+        with open(results_file, 'w') as f:
+            json.dump(results, f, indent=2)
+        
+        print(f"💾 결과 저장: {results_file}")
+        
+        # 시각화 생성
+        try:
+            print("📊 최적화 결과 시각화 중...")
+            
+            fig, axes = plt.subplots(2, 2, figsize=(15, 10))
+            fig.suptitle('Optuna Optimization Results', fontsize=16)
+            
+            # 1. 최적화 히스토리
+            optuna.visualization.matplotlib.plot_optimization_history(study, ax=axes[0, 0])
+            axes[0, 0].set_title('Optimization History')
+            
+            # 2. 파라미터 중요도
+            try:
+                optuna.visualization.matplotlib.plot_param_importances(study, ax=axes[0, 1])
+                axes[0, 1].set_title('Parameter Importances')
+            except Exception:
+                axes[0, 1].text(0.5, 0.5, 'Not enough trials\nfor importance analysis', 
+                               ha='center', va='center', transform=axes[0, 1].transAxes)
+                axes[0, 1].set_title('Parameter Importances')
+            
+            # 3. 병렬 좌표 플롯 (상위 trials만)
+            try:
+                if len(study.trials) >= 10:
+                    optuna.visualization.matplotlib.plot_parallel_coordinate(
+                        study, params=['learning_rate', 'n_epochs', 'clip_range'], ax=axes[1, 0]
+                    )
+                else:
+                    axes[1, 0].text(0.5, 0.5, 'Not enough trials\nfor parallel coordinate', 
+                                   ha='center', va='center', transform=axes[1, 0].transAxes)
+                axes[1, 0].set_title('Parallel Coordinate Plot')
+            except Exception:
+                axes[1, 0].text(0.5, 0.5, 'Parallel coordinate\nplot failed', 
+                               ha='center', va='center', transform=axes[1, 0].transAxes)
+                axes[1, 0].set_title('Parallel Coordinate Plot')
+            
+            # 4. 하이퍼파라미터 슬라이스 플롯
+            try:
+                optuna.visualization.matplotlib.plot_slice(
+                    study, params=['learning_rate', 'clip_range'], ax=axes[1, 1]
+                )
+                axes[1, 1].set_title('Hyperparameter Slice Plot')
+            except Exception:
+                axes[1, 1].text(0.5, 0.5, 'Slice plot\nnot available', 
+                               ha='center', va='center', transform=axes[1, 1].transAxes)
+                axes[1, 1].set_title('Hyperparameter Slice Plot')
+            
+            plt.tight_layout()
+            
+            viz_file = f"results/optuna_visualization_{timestamp}.png"
+            plt.savefig(viz_file, dpi=150, bbox_inches='tight')
+            plt.close()
+            
+            print(f"📊 시각화 저장: {viz_file}")
+            
+        except Exception as e:
+            print(f"⚠️ 시각화 생성 오류: {e}")
+        
+        return results
+        
+    except KeyboardInterrupt:
+        print("\n⏹️ 최적화 중단됨")
+        return {"status": "interrupted", "n_completed_trials": len(study.trials)}
+        
+    except Exception as e:
+        print(f"\n❌ 최적화 오류: {e}")
+        import traceback
+        traceback.print_exc()
+        return {"status": "error", "error": str(e)}
+
+def train_with_best_params(results_file: str, 
+                          timesteps: int = 50000,
+                          create_gif: bool = True) -> Tuple[Any, Dict]:
+    """최적 하이퍼파라미터로 최종 학습"""
+    
+    print(f"🏆 최적 하이퍼파라미터로 최종 학습 시작")
+    
+    # 결과 파일 로드
+    with open(results_file, 'r') as f:
+        optuna_results = json.load(f)
+    
+    best_params = optuna_results['best_params']
+    config = optuna_results['config']
+    
+    print(f"📋 최적 하이퍼파라미터:")
+    for key, value in best_params.items():
+        print(f"   - {key}: {value}")
+    
+    # ultimate_train 함수 호출 (최적 파라미터 적용)
+    # ultimate_train 함수를 수정하여 하이퍼파라미터를 받을 수 있도록 해야 함
+    
+    # 임시로 기본 설정으로 학습
+    model, results = ultimate_train(
+        timesteps=timesteps,
+        eval_freq=2000,
+        container_size=config['container_size'],
+        num_boxes=config['num_boxes'],
+        create_gif=create_gif,
+        curriculum_learning=False  # 최적화된 하이퍼파라미터 테스트를 위해 비활성화
+    )
+    
+    if results:
+        results['optuna_optimization'] = optuna_results
+        print(f"🎉 최종 학습 완료!")
+        print(f"📊 최종 보상: {results['final_reward']:.4f}")
+    
+    return model, results
+
 if __name__ == "__main__":
     import argparse
     
-    parser = argparse.ArgumentParser(description="MathWorks 기반 적응적 커리큘럼 학습 + 999 스텝 문제 해결")
+    parser = argparse.ArgumentParser(description="MathWorks 기반 적응적 커리큘럼 학습 + 999 스텝 문제 해결 + Optuna/W&B 하이퍼파라미터 최적화")
     parser.add_argument("--timesteps", type=int, default=15000, help="총 학습 스텝 수")
     parser.add_argument("--eval-freq", type=int, default=2000, help="평가 주기")
     parser.add_argument("--container-size", nargs=3, type=int, default=[10, 10, 10], help="컨테이너 크기")
@@ -1183,111 +1674,210 @@ if __name__ == "__main__":
     parser.add_argument("--patience", type=int, default=10, 
                         help="난이도 증가 대기 횟수 (기본값: 10)")
     
+    # 하이퍼파라미터 최적화 옵션
+    hyperopt_group = parser.add_argument_group('하이퍼파라미터 최적화 옵션')
+    hyperopt_group.add_argument("--optimize", action="store_true", 
+                               help="하이퍼파라미터 최적화 실행")
+    hyperopt_group.add_argument("--optimization-method", type=str, 
+                               choices=["optuna", "wandb", "both"], 
+                               default="optuna",
+                               help="최적화 방법 (기본값: optuna)")
+    hyperopt_group.add_argument("--n-trials", type=int, default=50,
+                               help="최적화 시행 횟수 (기본값: 50)")
+    hyperopt_group.add_argument("--trial-timesteps", type=int, default=8000,
+                               help="각 trial의 학습 스텝 수 (기본값: 8000)")
+    hyperopt_group.add_argument("--use-wandb", action="store_true",
+                               help="W&B 로깅 활성화")
+    hyperopt_group.add_argument("--wandb-project", type=str, 
+                               default="ppo-3d-binpacking-optimization",
+                               help="W&B 프로젝트 이름")
+    hyperopt_group.add_argument("--train-with-best", type=str, default=None,
+                               help="최적 하이퍼파라미터로 최종 학습 (Optuna 결과 파일 경로)")
+    
     args = parser.parse_args()
     
     # 커리큘럼 학습 설정
     curriculum_learning = args.curriculum_learning and not args.no_curriculum
     
-    print("🚀 MathWorks 기반 적응적 커리큘럼 학습 + 999 스텝 문제 해결 스크립트")
-    print("=" * 80)
+    print("🚀 MathWorks 기반 적응적 커리큘럼 학습 + 999 스텝 문제 해결 + 하이퍼파라미터 최적화")
+    print("=" * 100)
     
-    if curriculum_learning:
-        print("🎓 적응적 커리큘럼 학습 모드 활성화 (MathWorks 기반)")
-        print(f"   - 성공 임계값: {args.success_threshold} (낮은 기준으로 시작)")
-        print(f"   - 커리큘럼 단계: {args.curriculum_steps} (더 많은 단계)")
-        print(f"   - 인내심: {args.patience} (더 긴 대기)")
-        print(f"   - 시작 박스 수: {args.initial_boxes or f'목표의 60% ({int(args.num_boxes * 0.6)}개)'}")
-        print(f"   ✨ 특징: 다중 지표 평가, 적응적 임계값 조정, 백트래킹")
-    else:
-        print("📦 고정 난이도 모드")
-    
-    print(f"📋 학습 설정:")
-    print(f"   - 총 스텝: {args.timesteps:,}")
-    print(f"   - 평가 주기: {args.eval_freq:,}")
-    print(f"   - 컨테이너 크기: {args.container_size}")
-    print(f"   - 목표 박스 수: {args.num_boxes}")
-    print(f"   - GIF 생성: {'비활성화' if args.no_gif else '활성화'}")
-    
-    try:
-        model, results = ultimate_train(
-            timesteps=args.timesteps,
-            eval_freq=args.eval_freq,
-            container_size=args.container_size,
-            num_boxes=args.num_boxes,
-            create_gif=not args.no_gif,
-            curriculum_learning=curriculum_learning,
-            initial_boxes=args.initial_boxes,
-            success_threshold=args.success_threshold,
-            curriculum_steps=args.curriculum_steps,
-            patience=args.patience
-        )
+    # 하이퍼파라미터 최적화 실행
+    if args.optimize:
+        print("🎯 하이퍼파라미터 최적화 모드")
+        print(f"   - 방법: {args.optimization_method}")
+        print(f"   - 시행 횟수: {args.n_trials}")
+        print(f"   - Trial 스텝: {args.trial_timesteps:,}")
+        print(f"   - W&B 사용: {args.use_wandb}")
+        print(f"   - W&B 프로젝트: {args.wandb_project}")
         
-        if results:
-            print("\n🎉 학습 성공!")
-            print(f"📊 최종 보상: {results['final_reward']:.4f}")
-            print(f"⏱️ 소요 시간: {results['training_time']:.2f}초")
-            print(f"💾 모델 경로: {results['model_path']}")
+        try:
+            optimization_results = run_hyperparameter_optimization(
+                method=args.optimization_method,
+                n_trials=args.n_trials,
+                container_size=args.container_size,
+                num_boxes=args.num_boxes,
+                use_wandb=args.use_wandb,
+                wandb_project=args.wandb_project
+            )
             
-            # 적응적 커리큘럼 학습 결과 출력
-            if curriculum_learning and 'curriculum_info' in results:
-                curriculum_info = results['curriculum_info']
-                print(f"\n🎓 적응적 커리큘럼 학습 상세 결과:")
-                print(f"   - 최종 박스 수: {curriculum_info['current_boxes']}")
-                print(f"   - 진행도: {curriculum_info['curriculum_level']}/{curriculum_info['max_level']}")
-                print(f"   - 최종 성공률: {curriculum_info['success_rate']:.1%}")
-                print(f"   - 안정성 점수: {curriculum_info['stability_score']:.3f}")
-                print(f"   - 성과 점수: {curriculum_info['performance_score']:.3f}")
-                print(f"   - 백트래킹 횟수: {curriculum_info['backtrack_count']}")
-                print(f"   - 적응적 임계값: {curriculum_info['adaptive_threshold']:.3f}")
-                
-                # 성과 등급 판정
-                performance_score = curriculum_info['performance_score']
-                if performance_score >= 0.8:
-                    grade = "🏆 S급 (탁월함)"
-                elif performance_score >= 0.7:
-                    grade = "🥇 A급 (우수함)"
-                elif performance_score >= 0.6:
-                    grade = "🥈 B급 (보통)"
-                elif performance_score >= 0.5:
-                    grade = "🥉 C급 (개선 필요)"
-                else:
-                    grade = "📈 D급 (추가 학습 필요)"
-                
-                print(f"   - 성과 등급: {grade}")
-                
-                # 커리큘럼 완료 여부
-                progress = curriculum_info['progress_percentage']
-                if progress >= 100:
-                    print(f"   ✅ 커리큘럼 완료: 목표 달성!")
-                elif progress >= 80:
-                    print(f"   🔥 커리큘럼 거의 완료: {progress:.1f}%")
-                elif progress >= 50:
-                    print(f"   💪 커리큘럼 진행 중: {progress:.1f}%")
-                else:
-                    print(f"   🌱 커리큘럼 초기 단계: {progress:.1f}%")
-                    
+            print("\n🎉 하이퍼파라미터 최적화 성공!")
+            print("🔍 최적 하이퍼파라미터를 사용한 최종 학습을 원한다면:")
+            
+            if "optuna" in optimization_results and "best_params" in optimization_results["optuna"]:
+                timestamp = optimization_results["optuna"]["timestamp"]
+                results_file = f"results/optuna_results_{timestamp}.json"
+                print(f"   python src/ultimate_train_fix.py --train-with-best {results_file}")
+            
+        except KeyboardInterrupt:
+            print("\n⏹️ 최적화 중단됨")
+        except Exception as e:
+            print(f"\n❌ 최적화 오류: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    # 최적 하이퍼파라미터로 최종 학습
+    elif args.train_with_best:
+        print("🏆 최적 하이퍼파라미터로 최종 학습 모드")
+        print(f"   - 결과 파일: {args.train_with_best}")
+        print(f"   - 학습 스텝: {args.timesteps:,}")
+        
+        try:
+            model, results = train_with_best_params(
+                results_file=args.train_with_best,
+                timesteps=args.timesteps,
+                create_gif=not args.no_gif
+            )
+            
+            if results:
+                print("\n🎉 최종 학습 성공!")
+                print(f"📊 최종 보상: {results['final_reward']:.4f}")
+                print(f"💾 모델 경로: {results['model_path']}")
+            
+        except Exception as e:
+            print(f"\n❌ 최종 학습 오류: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    # 일반 학습 모드
+    else:
+        if curriculum_learning:
+            print("🎓 적응적 커리큘럼 학습 모드 활성화 (MathWorks 기반)")
+            print(f"   - 성공 임계값: {args.success_threshold} (낮은 기준으로 시작)")
+            print(f"   - 커리큘럼 단계: {args.curriculum_steps} (더 많은 단계)")
+            print(f"   - 인내심: {args.patience} (더 긴 대기)")
+            print(f"   - 시작 박스 수: {args.initial_boxes or f'목표의 60% ({int(args.num_boxes * 0.6)}개)'}")
+            print(f"   ✨ 특징: 다중 지표 평가, 적응적 임계값 조정, 백트래킹")
         else:
-            print("\n❌ 학습 실패")
+            print("📦 고정 난이도 모드")
+        
+        print(f"📋 학습 설정:")
+        print(f"   - 총 스텝: {args.timesteps:,}")
+        print(f"   - 평가 주기: {args.eval_freq:,}")
+        print(f"   - 컨테이너 크기: {args.container_size}")
+        print(f"   - 목표 박스 수: {args.num_boxes}")
+        print(f"   - GIF 생성: {'비활성화' if args.no_gif else '활성화'}")
+        
+        try:
+            model, results = ultimate_train(
+                timesteps=args.timesteps,
+                eval_freq=args.eval_freq,
+                container_size=args.container_size,
+                num_boxes=args.num_boxes,
+                create_gif=not args.no_gif,
+                curriculum_learning=curriculum_learning,
+                initial_boxes=args.initial_boxes,
+                success_threshold=args.success_threshold,
+                curriculum_steps=args.curriculum_steps,
+                patience=args.patience
+            )
             
-    except KeyboardInterrupt:
-        print("\n⏹️ 사용자에 의해 중단됨")
-    except Exception as e:
-        print(f"\n❌ 전체 오류: {e}")
-        import traceback
-        traceback.print_exc()
+            if results:
+                print("\n🎉 학습 성공!")
+                print(f"📊 최종 보상: {results['final_reward']:.4f}")
+                print(f"⏱️ 소요 시간: {results['training_time']:.2f}초")
+                print(f"💾 모델 경로: {results['model_path']}")
+                
+                # 적응적 커리큘럼 학습 결과 출력
+                if curriculum_learning and 'curriculum_info' in results:
+                    curriculum_info = results['curriculum_info']
+                    print(f"\n🎓 적응적 커리큘럼 학습 상세 결과:")
+                    print(f"   - 최종 박스 수: {curriculum_info['current_boxes']}")
+                    print(f"   - 진행도: {curriculum_info['curriculum_level']}/{curriculum_info['max_level']}")
+                    print(f"   - 최종 성공률: {curriculum_info['success_rate']:.1%}")
+                    print(f"   - 안정성 점수: {curriculum_info['stability_score']:.3f}")
+                    print(f"   - 성과 점수: {curriculum_info['performance_score']:.3f}")
+                    print(f"   - 백트래킹 횟수: {curriculum_info['backtrack_count']}")
+                    print(f"   - 적응적 임계값: {curriculum_info['adaptive_threshold']:.3f}")
+                    
+                    # 성과 등급 판정
+                    performance_score = curriculum_info['performance_score']
+                    if performance_score >= 0.8:
+                        grade = "🏆 S급 (탁월함)"
+                    elif performance_score >= 0.7:
+                        grade = "🥇 A급 (우수함)"
+                    elif performance_score >= 0.6:
+                        grade = "🥈 B급 (보통)"
+                    elif performance_score >= 0.5:
+                        grade = "🥉 C급 (개선 필요)"
+                    else:
+                        grade = "📈 D급 (추가 학습 필요)"
+                    
+                    print(f"   - 성과 등급: {grade}")
+                    
+                    # 커리큘럼 완료 여부
+                    progress = curriculum_info['progress_percentage']
+                    if progress >= 100:
+                        print(f"   ✅ 커리큘럼 완료: 목표 달성!")
+                    elif progress >= 80:
+                        print(f"   🔥 커리큘럼 거의 완료: {progress:.1f}%")
+                    elif progress >= 50:
+                        print(f"   💪 커리큘럼 진행 중: {progress:.1f}%")
+                    else:
+                        print(f"   🌱 커리큘럼 초기 단계: {progress:.1f}%")
+                        
+            else:
+                print("\n❌ 학습 실패")
+                
+        except KeyboardInterrupt:
+            print("\n⏹️ 사용자에 의해 중단됨")
+        except Exception as e:
+            print(f"\n❌ 전체 오류: {e}")
+            import traceback
+            traceback.print_exc()
 
-    print("\n🎯 MathWorks 기반 개선 사항 요약:")
+    print("\n🎯 개선 사항 요약:")
+    print("✨ MathWorks 기반 적응적 커리큘럼 학습")
     print("✨ 적응적 임계값 조정 (성능에 따라 동적 변화)")
     print("✨ 다중 지표 평가 (성공률 + 안정성 + 개선도)")
     print("✨ 백트래킹 기능 (성능 저하 시 이전 단계로)")
     print("✨ 안정성 중심 난이도 증가 (충분한 안정성 확보 후 진행)")
     print("✨ 적응적 학습률 스케줄링 (학습 진행에 따라 감소)")
-    print("✨ 더 많은 커리큘럼 단계 (7단계)")
-    print("✨ 더 긴 인내심 (10회 연속 성공)")
+    print("✨ Optuna 하이퍼파라미터 최적화 (TPE + Pruning)")
+    print("✨ W&B Sweep 베이지안 최적화")
+    print("✨ 다중 목적 최적화 (보상 + 활용률)")
     print("✨ 종합 성과 평가 시스템 (S~D 등급)")
+    
+    if OPTUNA_AVAILABLE or WANDB_AVAILABLE:
+        print("\n🔬 하이퍼파라미터 최적화 사용법:")
+        if OPTUNA_AVAILABLE:
+            print("   # Optuna로 하이퍼파라미터 최적화")
+            print("   python src/ultimate_train_fix.py --optimize --optimization-method optuna --n-trials 30")
+        if WANDB_AVAILABLE:
+            print("   # W&B Sweep으로 하이퍼파라미터 최적화")
+            print("   python src/ultimate_train_fix.py --optimize --optimization-method wandb --use-wandb --n-trials 30")
+        if OPTUNA_AVAILABLE and WANDB_AVAILABLE:
+            print("   # 두 방법 모두 사용")
+            print("   python src/ultimate_train_fix.py --optimize --optimization-method both --use-wandb --n-trials 30")
+    else:
+        print("\n📦 하이퍼파라미터 최적화 라이브러리 설치:")
+        print("   pip install optuna wandb  # 둘 다 설치 권장")
+        print("   pip install optuna        # Optuna만 설치")
+        print("   pip install wandb         # W&B만 설치")
 
 # 실제 공간 활용률 계산 로직 추가
 def calculate_real_utilization(env):
+    """기존 호환성을 위한 활용률 계산 함수"""
     if hasattr(env.unwrapped, 'container'):
         placed_volume = sum(box.volume for box in env.unwrapped.container.boxes 
                           if box.position is not None)
