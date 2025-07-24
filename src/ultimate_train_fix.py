@@ -19,45 +19,22 @@ import json
 from typing import Dict, Any, Optional, Tuple
 
 # 하이퍼파라미터 최적화 라이브러리
-print("🔍 하이퍼파라미터 최적화 라이브러리 확인 중...")
-
-# Optuna 설치 상태 확인
 try:
-    import sys
-    print(f"📍 Python 경로: {sys.executable}")
-    print(f"📍 Python 버전: {sys.version}")
-    
     import optuna
-    print(f"✅ Optuna 버전: {optuna.__version__}")
-    
-    # WeightsAndBiasesCallback은 선택적 import
-    try:
-        from optuna.integration import WeightsAndBiasesCallback
-        print("✅ Optuna W&B 통합 사용 가능")
-    except ImportError:
-        print("⚠️ Optuna W&B 통합 없음 (선택사항)")
-    
+    from optuna.integration import WeightsAndBiasesCallback
     OPTUNA_AVAILABLE = True
     print("✅ Optuna 사용 가능")
-    
-except ImportError as e:
+except ImportError:
     OPTUNA_AVAILABLE = False
-    print(f"⚠️ Optuna 없음 - 오류: {e}")
-    print("💡 해결 방법:")
-    print("   uv pip install 'optuna>=3.4.0,<4.0.0'")
-    print("   또는")
-    print("   pip install optuna")
+    print("⚠️ Optuna 없음 - pip install optuna 필요")
 
-# W&B 설치 상태 확인
 try:
     import wandb
-    print(f"✅ W&B 버전: {wandb.__version__}")
     WANDB_AVAILABLE = True
     print("✅ W&B 사용 가능")
-except ImportError as e:
+except ImportError:
     WANDB_AVAILABLE = False
-    print(f"⚠️ W&B 없음 - 오류: {e}")
-    print("💡 해결 방법: uv pip install 'wandb>=0.15.0'")
+    print("⚠️ W&B 없음 - pip install wandb 필요")
 
 # 서버 환경 대응
 matplotlib.use('Agg')
@@ -421,10 +398,10 @@ class AdaptiveCurriculumCallback(BaseCallback):
         initial_boxes,
         target_boxes,
         num_visible_boxes,
-        success_threshold=0.5,  # MathWorks 권장: 낮은 기준으로 시작
+        success_threshold=0.45,  # MathWorks 권장: 낮은 기준으로 시작
         curriculum_steps=7,     # 더 많은 단계
-        patience=8,            # 더 긴 인내심
-        stability_window=30,   # 안정성 측정 윈도우
+        patience=10,            # 더 긴 인내심
+        stability_window=50,   # 안정성 측정 윈도우
         verbose=1,
     ):
         super().__init__(verbose)
@@ -536,9 +513,9 @@ class AdaptiveCurriculumCallback(BaseCallback):
             
             # 종합 성과 점수 (MathWorks 가중 평균)
             performance_score = (
-                success_rate * 0.4 +          # 성공률 40%
-                stability_score * 0.3 +       # 안정성 30%
-                max(0, util_improvement) * 0.3 # 개선도 30%
+                success_rate * 0.3 +          # 성공률 30%
+                stability_score * 0.7 +       # 안정성 70%
+                max(0, util_improvement) * 0.0 # 개선도 0%
             )
             
             # 현재 성과 기록
@@ -1148,7 +1125,7 @@ def ultimate_train(
                     break
             
             final_rewards.append(episode_reward)
-            
+        
         final_reward = np.mean(final_rewards) if final_rewards else 0.0
         print(f"📈 최종 평가 보상: {final_reward:.4f}")
         
@@ -1386,8 +1363,8 @@ def optuna_objective(trial: 'optuna.Trial',
                     )
                     
                     # 다중 목적 최적화: 가중 합산
-                    # 보상 * 0.7 + 활용률 * 0.3
-                    combined_score = mean_reward * 0.7 + mean_utilization * 100 * 0.3
+                    # 보상 * 0.3 + 활용률 * 0.7 (공간 효율성 우선)
+                    combined_score = mean_reward * 0.3 + mean_utilization * 100 * 0.7
                     
                     # Optuna에 중간 결과 보고
                     self.trial.report(combined_score, self.num_timesteps)
@@ -1422,8 +1399,8 @@ def optuna_objective(trial: 'optuna.Trial',
         )
         
         # 다중 목적 최적화: 가중 합산
-        # 보상에 더 큰 가중치 (0.7), 활용률에 0.3
-        combined_score = mean_reward * 0.7 + mean_utilization * 100 * 0.3
+        # 보상 * 0.3 + 활용률 * 0.7 (공간 효율성 우선)
+        combined_score = mean_reward * 0.3 + mean_utilization * 100 * 0.7
         
         print(f"✅ Trial {trial.number} 완료:")
         print(f"   - 평균 보상: {mean_reward:.4f}")
@@ -1628,7 +1605,7 @@ def run_optuna_optimization(
     except KeyboardInterrupt:
         print("\n⏹️ 최적화 중단됨")
         return {"status": "interrupted", "n_completed_trials": len(study.trials)}
-        
+    
     except Exception as e:
         print(f"\n❌ 최적화 오류: {e}")
         import traceback
@@ -1672,99 +1649,6 @@ def train_with_best_params(results_file: str,
         print(f"📊 최종 보상: {results['final_reward']:.4f}")
     
     return model, results
-
-def run_hyperparameter_optimization(
-    method: str = "optuna",  # "optuna", "wandb", "both"
-    n_trials: int = 50,
-    container_size: list = [10, 10, 10],
-    num_boxes: int = 16,
-    use_wandb: bool = False,
-    wandb_project: str = "ppo-3d-binpacking-optimization"
-) -> Dict[str, Any]:
-    """통합 하이퍼파라미터 최적화 실행"""
-    
-    print(f"🎯 하이퍼파라미터 최적화 시작 (방법: {method})")
-    
-    # 라이브러리 사용 가능성 확인
-    if method == "optuna" or method == "both":
-        if not OPTUNA_AVAILABLE:
-            print("❌ Optuna 최적화 실패: Optuna가 설치되지 않았습니다")
-            print("💡 해결 방법:")
-            print("   uv pip install 'optuna>=3.4.0,<4.0.0'")
-            print("   또는")
-            print("   pip install optuna")
-            if method == "optuna":  # Optuna만 사용하려는 경우
-                return {"status": "error", "error": "Optuna not available"}
-    
-    if method == "wandb" or method == "both":
-        if not WANDB_AVAILABLE:
-            print("❌ W&B 최적화 실패: W&B가 설치되지 않았습니다")
-            print("💡 해결 방법: uv pip install 'wandb>=0.15.0'")
-            if method == "wandb":  # W&B만 사용하려는 경우
-                return {"status": "error", "error": "W&B not available"}
-    
-    results = {}
-    
-    if (method == "optuna" or method == "both") and OPTUNA_AVAILABLE:
-        print("\n" + "="*60)
-        print("🔬 Optuna 최적화 실행")
-        print("="*60)
-        
-        try:
-            optuna_results = run_optuna_optimization(
-                n_trials=n_trials,
-                container_size=container_size,
-                num_boxes=num_boxes,
-                trial_timesteps=8000,  # 빠른 실험을 위해 8000 스텝
-                use_wandb=use_wandb,
-                wandb_project=f"{wandb_project}-optuna"
-            )
-            
-            results["optuna"] = optuna_results
-        except Exception as e:
-            print(f"❌ Optuna 최적화 중 오류 발생: {e}")
-            results["optuna_error"] = str(e)
-    
-    if (method == "wandb" or method == "both") and WANDB_AVAILABLE:
-        print("\n" + "="*60)
-        print("🌊 W&B Sweep 최적화 실행")
-        print("="*60)
-        
-        try:
-            sweep_id = run_wandb_sweep(
-                n_runs=n_trials,
-                project_name=f"{wandb_project}-sweep"
-            )
-            results["wandb_sweep_id"] = sweep_id
-        except Exception as e:
-            print(f"❌ W&B Sweep 중 오류 발생: {e}")
-            results["wandb_error"] = str(e)
-    
-    # 결과 요약
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    
-    print(f"\n🎉 하이퍼파라미터 최적화 완료!")
-    print(f"📊 실행된 방법: {method}")
-    print(f"⏱️ 시간: {timestamp}")
-    
-    if "optuna" in results and "best_value" in results["optuna"]:
-        print(f"🏆 Optuna 최고 성능: {results['optuna']['best_value']:.4f}")
-        print(f"🎯 Optuna 최적 파라미터:")
-        for key, value in results["optuna"]["best_params"].items():
-            print(f"   - {key}: {value}")
-    
-    if "wandb_sweep_id" in results:
-        print(f"🌊 W&B Sweep ID: {results['wandb_sweep_id']}")
-        print(f"🔗 W&B 대시보드: https://wandb.ai")
-    
-    # 통합 결과 저장
-    summary_file = f"results/hyperparameter_optimization_summary_{timestamp}.json"
-    with open(summary_file, 'w') as f:
-        json.dump(results, f, indent=2)
-    
-    print(f"💾 결과 요약 저장: {summary_file}")
-    
-    return results
 
 if __name__ == "__main__":
     import argparse
@@ -1895,24 +1779,24 @@ if __name__ == "__main__":
         print(f"   - GIF 생성: {'비활성화' if args.no_gif else '활성화'}")
         
         try:
-            model, results = ultimate_train(
-                timesteps=args.timesteps,
-                eval_freq=args.eval_freq,
+    model, results = ultimate_train(
+        timesteps=args.timesteps,
+        eval_freq=args.eval_freq,
                 container_size=args.container_size,
-                num_boxes=args.num_boxes,
+        num_boxes=args.num_boxes,
                 create_gif=not args.no_gif,
                 curriculum_learning=curriculum_learning,
                 initial_boxes=args.initial_boxes,
                 success_threshold=args.success_threshold,
                 curriculum_steps=args.curriculum_steps,
                 patience=args.patience
-            )
-            
-            if results:
-                print("\n🎉 학습 성공!")
-                print(f"📊 최종 보상: {results['final_reward']:.4f}")
-                print(f"⏱️ 소요 시간: {results['training_time']:.2f}초")
-                print(f"💾 모델 경로: {results['model_path']}")
+    )
+    
+    if results:
+        print("\n🎉 학습 성공!")
+        print(f"📊 최종 보상: {results['final_reward']:.4f}")
+        print(f"⏱️ 소요 시간: {results['training_time']:.2f}초")
+        print(f"💾 모델 경로: {results['model_path']}")
                 
                 # 적응적 커리큘럼 학습 결과 출력
                 if curriculum_learning and 'curriculum_info' in results:
@@ -1952,8 +1836,8 @@ if __name__ == "__main__":
                     else:
                         print(f"   🌱 커리큘럼 초기 단계: {progress:.1f}%")
                         
-            else:
-                print("\n❌ 학습 실패")
+    else:
+        print("\n❌ 학습 실패") 
                 
         except KeyboardInterrupt:
             print("\n⏹️ 사용자에 의해 중단됨")
@@ -2000,300 +1884,3 @@ def calculate_real_utilization(env):
         container_volume = env.unwrapped.container.volume
         return placed_volume / container_volume
     return 0.0
-
-def create_wandb_sweep_config() -> Dict[str, Any]:
-    """W&B Sweep 설정 생성"""
-    
-    sweep_config = {
-        "method": "bayes",  # bayes, grid, random
-        "metric": {
-            "goal": "maximize",
-            "name": "combined_score"
-        },
-        "parameters": {
-            "learning_rate": {
-                "distribution": "log_uniform_values",
-                "min": 1e-6,
-                "max": 1e-3
-            },
-            "n_steps": {
-                "values": [1024, 2048, 4096]
-            },
-            "batch_size": {
-                "values": [64, 128, 256]
-            },
-            "n_epochs": {
-                "distribution": "int_uniform",
-                "min": 3,
-                "max": 15
-            },
-            "clip_range": {
-                "distribution": "uniform",
-                "min": 0.1,
-                "max": 0.4
-            },
-            "ent_coef": {
-                "distribution": "log_uniform_values",
-                "min": 1e-4,
-                "max": 1e-1
-            },
-            "vf_coef": {
-                "distribution": "uniform",
-                "min": 0.1,
-                "max": 1.0
-            },
-            "gae_lambda": {
-                "distribution": "uniform",
-                "min": 0.9,
-                "max": 0.99
-            }
-        }
-    }
-    
-    return sweep_config
-
-def wandb_sweep_train():
-    """W&B Sweep을 위한 학습 함수"""
-    
-    if not WANDB_AVAILABLE:
-        raise ImportError("W&B가 설치되지 않았습니다: pip install wandb")
-    
-    # W&B 초기화
-    wandb.init()
-    
-    # Sweep에서 제안된 하이퍼파라미터 가져오기
-    config = wandb.config
-    
-    print(f"\n🔬 W&B Sweep Run 시작")
-    print(f"📋 하이퍼파라미터:")
-    for key, value in config.items():
-        print(f"   - {key}: {value}")
-    
-    try:
-        # 환경 생성 (기본 설정 사용)
-        container_size = [10, 10, 10]
-        num_boxes = 16
-        
-        env = make_env(
-            container_size=container_size,
-            num_boxes=num_boxes,
-            num_visible_boxes=3,
-            seed=42,
-            render_mode=None,
-            random_boxes=False,
-            only_terminal_reward=False,
-            improved_reward_shaping=True,
-        )()
-        
-        eval_env = make_env(
-            container_size=container_size,
-            num_boxes=num_boxes,
-            num_visible_boxes=3,
-            seed=43,
-            render_mode=None,
-            random_boxes=False,
-            only_terminal_reward=False,
-            improved_reward_shaping=True,
-        )()
-        
-        # 모니터링 설정
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        env = Monitor(env, f"logs/wandb_train_{wandb.run.id}_{timestamp}.csv")
-        eval_env = Monitor(eval_env, f"logs/wandb_eval_{wandb.run.id}_{timestamp}.csv")
-        
-        # 모델 생성 (W&B config의 하이퍼파라미터 사용)
-        model = MaskablePPO(
-            "MultiInputPolicy",
-            env,
-            learning_rate=config.learning_rate,
-            n_steps=config.n_steps,
-            batch_size=config.batch_size,
-            n_epochs=config.n_epochs,
-            gamma=0.99,
-            gae_lambda=config.gae_lambda,
-            clip_range=config.clip_range,
-            clip_range_vf=None,
-            ent_coef=config.ent_coef,
-            vf_coef=config.vf_coef,
-            max_grad_norm=0.5,
-            verbose=0,
-            seed=42,
-            policy_kwargs=dict(
-                net_arch=[256, 256, 128],
-                activation_fn=torch.nn.ReLU,
-                share_features_extractor=True,
-            )
-        )
-        
-        # W&B 모니터링 콜백
-        class WandbCallback(BaseCallback):
-            def __init__(self, eval_env, eval_freq=1000):
-                super().__init__()
-                self.eval_env = eval_env
-                self.eval_freq = eval_freq
-                self.last_eval = 0
-                
-            def _on_step(self) -> bool:
-                if self.num_timesteps % 100 == 0:  # 매 100 스텝마다 로깅
-                    # 현재 학습 정보 로깅
-                    if len(self.model.ep_info_buffer) > 0:
-                        recent_rewards = [ep_info["r"] for ep_info in self.model.ep_info_buffer[-10:]]
-                        if recent_rewards:
-                            wandb.log({
-                                "step": self.num_timesteps,
-                                "mean_episode_reward": np.mean(recent_rewards),
-                                "latest_episode_reward": recent_rewards[-1]
-                            })
-                
-                # 주기적 평가
-                if self.num_timesteps - self.last_eval >= self.eval_freq:
-                    mean_reward, mean_utilization = evaluate_model_performance(
-                        self.model, self.eval_env, n_episodes=3
-                    )
-                    
-                    # 다중 목적 최적화: 가중 합산
-                    combined_score = mean_reward * 0.7 + mean_utilization * 100 * 0.3
-                    
-                    wandb.log({
-                        "step": self.num_timesteps,
-                        "eval_mean_reward": mean_reward,
-                        "eval_mean_utilization": mean_utilization,
-                        "combined_score": combined_score
-                    })
-                    
-                    self.last_eval = self.num_timesteps
-                
-                return True
-        
-        # 학습 실행
-        timesteps = 8000  # Sweep용 짧은 학습
-        wandb_callback = WandbCallback(eval_env)
-        
-        print(f"🚀 학습 시작: {timesteps:,} 스텝")
-        start_time = time.time()
-        
-        model.learn(
-            total_timesteps=timesteps,
-            callback=wandb_callback,
-            progress_bar=False
-        )
-        
-        training_time = time.time() - start_time
-        
-        # 최종 평가
-        print(f"📊 최종 평가 중...")
-        mean_reward, mean_utilization = evaluate_model_performance(
-            model, eval_env, n_episodes=5
-        )
-        
-        # 다중 목적 최적화 점수 계산
-        combined_score = mean_reward * 0.7 + mean_utilization * 100 * 0.3
-        
-        # 최종 결과 로깅
-        wandb.log({
-            "final_mean_reward": mean_reward,
-            "final_mean_utilization": mean_utilization,
-            "final_combined_score": combined_score,
-            "training_time": training_time,
-            "total_timesteps": timesteps
-        })
-        
-        print(f"✅ W&B Run 완료:")
-        print(f"   - 평균 보상: {mean_reward:.4f}")
-        print(f"   - 평균 활용률: {mean_utilization:.1%}")
-        print(f"   - 종합 점수: {combined_score:.4f}")
-        print(f"   - 학습 시간: {training_time:.1f}초")
-        
-        # 환경 정리
-        env.close()
-        eval_env.close()
-        
-        return combined_score
-        
-    except Exception as e:
-        print(f"❌ W&B Run 오류: {e}")
-        import traceback
-        traceback.print_exc()
-        
-        # 오류 로깅
-        wandb.log({"error": str(e), "status": "failed"})
-        return -1000.0
-
-def run_wandb_sweep(
-    n_runs: int = 50,
-    project_name: str = "ppo-3d-binpacking-sweep"
-) -> str:
-    """W&B Sweep 실행"""
-    
-    if not WANDB_AVAILABLE:
-        raise ImportError("W&B가 설치되지 않았습니다: pip install wandb")
-    
-    print("🌊 W&B Sweep 하이퍼파라미터 최적화 시작")
-    print(f"📋 설정:")
-    print(f"   - 실행 횟수: {n_runs}")
-    print(f"   - 프로젝트: {project_name}")
-    
-    # Sweep 설정 생성
-    sweep_config = create_wandb_sweep_config()
-    
-    print(f"🔧 Sweep 설정:")
-    print(f"   - 방법: {sweep_config['method']}")
-    print(f"   - 목표: {sweep_config['metric']['goal']} {sweep_config['metric']['name']}")
-    
-    try:
-        # Sweep 초기화
-        sweep_id = wandb.sweep(sweep_config, project=project_name)
-        print(f"📊 Sweep 생성 완료: {sweep_id}")
-        
-        # Sweep 실행
-        print(f"🚀 Sweep 실행 시작...")
-        wandb.agent(sweep_id, wandb_sweep_train, count=n_runs)
-        
-        print(f"🎉 W&B Sweep 완료!")
-        print(f"🔗 결과 확인: https://wandb.ai/project/{project_name}")
-        
-        return sweep_id
-        
-    except Exception as e:
-        print(f"❌ W&B Sweep 오류: {e}")
-        import traceback
-        traceback.print_exc()
-        return None
-
-def train_with_best_params(results_file: str,
-                          timesteps: int = 50000,
-                          create_gif: bool = True) -> Tuple[Any, Dict]:
-    """최적 하이퍼파라미터로 최종 학습"""
-    
-    print(f"🏆 최적 하이퍼파라미터로 최종 학습 시작")
-    
-    # 결과 파일 로드
-    with open(results_file, 'r') as f:
-        optuna_results = json.load(f)
-    
-    best_params = optuna_results['best_params']
-    config = optuna_results['config']
-    
-    print(f"📋 최적 하이퍼파라미터:")
-    for key, value in best_params.items():
-        print(f"   - {key}: {value}")
-    
-    # ultimate_train 함수 호출 (최적 파라미터 적용)
-    # ultimate_train 함수를 수정하여 하이퍼파라미터를 받을 수 있도록 해야 함
-    
-    # 임시로 기본 설정으로 학습
-    model, results = ultimate_train(
-        timesteps=timesteps,
-        eval_freq=2000,
-        container_size=config['container_size'],
-        num_boxes=config['num_boxes'],
-        create_gif=create_gif,
-        curriculum_learning=False  # 최적화된 하이퍼파라미터 테스트를 위해 비활성화
-    )
-    
-    if results:
-        results['optuna_optimization'] = optuna_results
-        print(f"🎉 최종 학습 완료!")
-        print(f"📊 최종 보상: {results['final_reward']:.4f}")
-    
-    return model, results
