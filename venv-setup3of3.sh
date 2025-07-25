@@ -63,16 +63,16 @@ echo "이제 다음 명령어로 학습을 시작 :"
 echo "python -m src/ultimate_train_fix --timesteps 20000 --eval-freq 1500 --container-size 10 10 10 --num-boxes 32 --curriculum-learning --improved-rewards"
 
 
-# ## Hyperparameter 최적화 도구인 Optuna(및 관련 W&B)의 설치 ##
-# uv pip install "optuna>=3.4.0,<4.0.0"
+## Hyperparameter 최적화 도구인 Optuna(및 관련 W&B)의 설치 ##
+uv pip install "optuna>=3.4.0,<4.0.0"
 
-# # 시각화 의존성 개별 설치 (충돌 방지)
-# uv pip install plotly>=5.0.0
-# uv pip install matplotlib>=3.5.0
-# uv pip install seaborn>=0.11.0
+# 시각화 의존성 개별 설치 (충돌 방지)
+uv pip install plotly>=5.0.0
+uv pip install matplotlib>=3.5.0
+uv pip install seaborn>=0.11.0
 
-# # Optuna 시각화 기능 활성화
-# uv pip install optuna[visualization]
+# Optuna 시각화 기능 활성화
+uv pip install optuna[visualization]
 
-# # W&B 설치
-# uv pip install "wandb>=0.15.0"
+# W&B 설치
+uv pip install "wandb>=0.15.0"
