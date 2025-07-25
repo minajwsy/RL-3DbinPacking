@@ -1777,7 +1777,7 @@ if __name__ == "__main__":
         print(f"   - 컨테이너 크기: {args.container_size}")
         print(f"   - 목표 박스 수: {args.num_boxes}")
         print(f"   - GIF 생성: {'비활성화' if args.no_gif else '활성화'}")
-        try:
+        
         try:
             model, results = ultimate_train(
                 timesteps=args.timesteps,
