@@ -1612,6 +1612,253 @@ def run_optuna_optimization(
         traceback.print_exc()
         return {"status": "error", "error": str(e)}
 
+def create_wandb_sweep_config() -> Dict[str, Any]:
+    """W&B Sweep 설정 생성"""
+    sweep_config = {
+        "method": "bayes",  # bayes, grid, random
+        "metric": {
+            "goal": "maximize",
+            "name": "combined_score"
+        },
+        "parameters": {
+            "learning_rate": {
+                "distribution": "log_uniform_values",
+                "min": 1e-6,
+                "max": 1e-3
+            },
+            "n_steps": {
+                "values": [1024, 2048, 4096]
+            },
+            "batch_size": {
+                "values": [64, 128, 256]
+            },
+            "n_epochs": {
+                "distribution": "int_uniform",
+                "min": 3,
+                "max": 15
+            },
+            "clip_range": {
+                "distribution": "uniform",
+                "min": 0.1,
+                "max": 0.4
+            },
+            "ent_coef": {
+                "distribution": "log_uniform_values",
+                "min": 1e-4,
+                "max": 1e-1
+            },
+            "vf_coef": {
+                "distribution": "uniform",
+                "min": 0.1,
+                "max": 1.0
+            },
+            "gae_lambda": {
+                "distribution": "uniform",
+                "min": 0.9,
+                "max": 0.99
+            }
+        }
+    }
+    return sweep_config
+
+def wandb_sweep_train():
+    """W&B Sweep에서 실행되는 학습 함수"""
+    if not WANDB_AVAILABLE:
+        raise ImportError("W&B가 설치되지 않았습니다: pip install wandb")
+    
+    # W&B run 초기화
+    with wandb.init() as run:
+        # 하이퍼파라미터 가져오기
+        config = wandb.config
+        
+        # 환경 생성
+        container_size = [10, 10, 10]
+        num_boxes = 16
+        
+        env = make_env(
+            container_size=container_size,
+            num_boxes=num_boxes,
+            num_visible_boxes=3,
+            seed=42,
+            render_mode=None,
+            random_boxes=False,
+            only_terminal_reward=False,
+            improved_reward_shaping=True,
+        )()
+        
+        eval_env = make_env(
+            container_size=container_size,
+            num_boxes=num_boxes,
+            num_visible_boxes=3,
+            seed=43,
+            render_mode=None,
+            random_boxes=False,
+            only_terminal_reward=False,
+            improved_reward_shaping=True,
+        )()
+        
+        # 모니터링 설정
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        env = Monitor(env, f"logs/wandb_train_{run.id}_{timestamp}.csv")
+        eval_env = Monitor(eval_env, f"logs/wandb_eval_{run.id}_{timestamp}.csv")
+        
+        # 모델 생성
+        model = MaskablePPO(
+            "MultiInputPolicy",
+            env,
+            learning_rate=config.learning_rate,
+            n_steps=config.n_steps,
+            batch_size=config.batch_size,
+            n_epochs=config.n_epochs,
+            gamma=0.99,
+            gae_lambda=config.gae_lambda,
+            clip_range=config.clip_range,
+            ent_coef=config.ent_coef,
+            vf_coef=config.vf_coef,
+            max_grad_norm=0.5,
+            verbose=0,
+            policy_kwargs=dict(
+                net_arch=[256, 256, 128],
+                activation_fn=torch.nn.ReLU,
+                share_features_extractor=True,
+            )
+        )
+        
+        # 학습
+        timesteps = 8000
+        model.learn(total_timesteps=timesteps, progress_bar=False)
+        
+        # 평가
+        mean_reward, mean_utilization = evaluate_model_performance(
+            model, eval_env, n_episodes=5
+        )
+        
+        # 다중 목적 최적화 점수 계산
+        combined_score = mean_reward * 0.3 + mean_utilization * 100 * 0.7
+        
+        # W&B 로깅
+        wandb.log({
+            "mean_episode_reward": mean_reward,
+            "mean_utilization_rate": mean_utilization,
+            "combined_score": combined_score,
+            "learning_rate": config.learning_rate,
+            "n_steps": config.n_steps,
+            "batch_size": config.batch_size,
+            "n_epochs": config.n_epochs,
+            "clip_range": config.clip_range,
+            "ent_coef": config.ent_coef,
+            "vf_coef": config.vf_coef,
+            "gae_lambda": config.gae_lambda
+        })
+        
+        # 환경 정리
+        env.close()
+        eval_env.close()
+
+def run_wandb_sweep(
+    n_trials: int = 50,
+    wandb_project: str = "ppo-3d-binpacking-sweep"
+) -> Dict[str, Any]:
+    """W&B Sweep 실행"""
+    
+    if not WANDB_AVAILABLE:
+        raise ImportError("W&B가 설치되지 않았습니다: pip install wandb")
+    
+    print("🌊 W&B Sweep 하이퍼파라미터 최적화 시작")
+    
+    # Sweep 설정
+    sweep_config = create_wandb_sweep_config()
+    
+    # Sweep 생성
+    sweep_id = wandb.sweep(sweep_config, project=wandb_project)
+    
+    print(f"📊 Sweep 생성 완료: {sweep_id}")
+    print(f"🔗 W&B 대시보드: https://wandb.ai/{wandb.api.default_entity}/{wandb_project}/sweeps/{sweep_id}")
+    
+    # Agent 실행
+    wandb.agent(sweep_id, wandb_sweep_train, count=n_trials)
+    
+    return {
+        "status": "completed",
+        "sweep_id": sweep_id,
+        "n_trials": n_trials,
+        "project": wandb_project
+    }
+
+def run_hyperparameter_optimization(
+    method: str = "optuna",
+    n_trials: int = 50,
+    container_size: list = [10, 10, 10],
+    num_boxes: int = 16,
+    trial_timesteps: int = 8000,
+    use_wandb: bool = False,
+    wandb_project: str = "ppo-3d-binpacking-optimization"
+) -> Dict[str, Any]:
+    """하이퍼파라미터 최적화 통합 함수"""
+    
+    print(f"🚀 하이퍼파라미터 최적화 시작 - 방법: {method}")
+    
+    results = {}
+    
+    if method == "optuna":
+        if not OPTUNA_AVAILABLE:
+            raise ImportError("Optuna가 설치되지 않았습니다: pip install optuna")
+        
+        results = run_optuna_optimization(
+            n_trials=n_trials,
+            container_size=container_size,
+            num_boxes=num_boxes,
+            trial_timesteps=trial_timesteps,
+            use_wandb=use_wandb,
+            wandb_project=wandb_project
+        )
+        
+    elif method == "wandb":
+        if not WANDB_AVAILABLE:
+            raise ImportError("W&B가 설치되지 않았습니다: pip install wandb")
+        
+        results = run_wandb_sweep(
+            n_trials=n_trials,
+            wandb_project=wandb_project
+        )
+        
+    elif method == "both":
+        if not OPTUNA_AVAILABLE or not WANDB_AVAILABLE:
+            missing = []
+            if not OPTUNA_AVAILABLE:
+                missing.append("optuna")
+            if not WANDB_AVAILABLE:
+                missing.append("wandb")
+            raise ImportError(f"필요한 라이브러리가 설치되지 않았습니다: pip install {' '.join(missing)}")
+        
+        print("📊 1단계: Optuna 최적화")
+        optuna_results = run_optuna_optimization(
+            n_trials=n_trials//2,
+            container_size=container_size,
+            num_boxes=num_boxes,
+            trial_timesteps=trial_timesteps,
+            use_wandb=use_wandb,
+            wandb_project=f"{wandb_project}-optuna"
+        )
+        
+        print("🌊 2단계: W&B Sweep 최적화")
+        wandb_results = run_wandb_sweep(
+            n_trials=n_trials//2,
+            wandb_project=f"{wandb_project}-sweep"
+        )
+        
+        results = {
+            "method": "both",
+            "optuna_results": optuna_results,
+            "wandb_results": wandb_results
+        }
+        
+    else:
+        raise ValueError(f"지원하지 않는 최적화 방법: {method}. 'optuna', 'wandb', 'both' 중 선택하세요.")
+    
+    print(f"✅ {method} 최적화 완료!")
+    return results
+
 def train_with_best_params(results_file: str, 
                           timesteps: int = 50000,
                           create_gif: bool = True) -> Tuple[Any, Dict]:
