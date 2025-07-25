@@ -1777,26 +1777,26 @@ if __name__ == "__main__":
         print(f"   - 컨테이너 크기: {args.container_size}")
         print(f"   - 목표 박스 수: {args.num_boxes}")
         print(f"   - GIF 생성: {'비활성화' if args.no_gif else '활성화'}")
-        
         try:
-    model, results = ultimate_train(
-        timesteps=args.timesteps,
-        eval_freq=args.eval_freq,
+        try:
+            model, results = ultimate_train(
+                timesteps=args.timesteps,
+                eval_freq=args.eval_freq,
                 container_size=args.container_size,
-        num_boxes=args.num_boxes,
+                num_boxes=args.num_boxes,
                 create_gif=not args.no_gif,
                 curriculum_learning=curriculum_learning,
                 initial_boxes=args.initial_boxes,
                 success_threshold=args.success_threshold,
                 curriculum_steps=args.curriculum_steps,
                 patience=args.patience
-    )
-    
-    if results:
-        print("\n🎉 학습 성공!")
-        print(f"📊 최종 보상: {results['final_reward']:.4f}")
-        print(f"⏱️ 소요 시간: {results['training_time']:.2f}초")
-        print(f"💾 모델 경로: {results['model_path']}")
+            )
+            
+            if results:
+                print("\n🎉 학습 성공!")
+                print(f"📊 최종 보상: {results['final_reward']:.4f}")
+                print(f"⏱️ 소요 시간: {results['training_time']:.2f}초")
+                print(f"💾 모델 경로: {results['model_path']}")
                 
                 # 적응적 커리큘럼 학습 결과 출력
                 if curriculum_learning and 'curriculum_info' in results:
@@ -1836,8 +1836,8 @@ if __name__ == "__main__":
                     else:
                         print(f"   🌱 커리큘럼 초기 단계: {progress:.1f}%")
                         
-    else:
-        print("\n❌ 학습 실패") 
+            else:
+                print("\n❌ 학습 실패")
                 
         except KeyboardInterrupt:
             print("\n⏹️ 사용자에 의해 중단됨")
