@@ -16,7 +16,7 @@ if nvidia-smi > /dev/null 2>&1; then
     echo "=== 필수 패키지 개별 설치 중 ==="
     # 핵심 패키지들을 개별적으로 설치
     uv pip install gymnasium numpy nptyping pillow pandas jupyter pytest
-    uv pip install sb3-contrib stable-baselines3[extra] tensorboard matplotlib opencv-python tqdm rich
+    uv pip install sb3-contrib stable-baselines3[extra] tensorboard opencv-python tqdm rich #matplotlib 
     
     # narwhals 및 관련 의존성 설치
     echo "=== 누락된 의존성 설치 중 ==="
@@ -49,7 +49,7 @@ else
     echo "=== 필수 패키지 개별 설치 중 ==="
     # 핵심 패키지들을 개별적으로 설치
     uv pip install gymnasium numpy nptyping pillow pandas jupyter pytest
-    uv pip install sb3-contrib stable-baselines3[extra] tensorboard matplotlib opencv-python tqdm rich
+    uv pip install sb3-contrib stable-baselines3[extra] tensorboard opencv-python tqdm rich #matplotlib
     
     # narwhals 및 관련 의존성 설치
     echo "=== 누락된 의존성 설치 중 ==="
