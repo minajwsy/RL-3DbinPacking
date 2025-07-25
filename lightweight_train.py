@@ -25,9 +25,12 @@ def minimal_train():
         import numpy as np
         print("✅ numpy 로드 완료")
         
-        # 로컬 모듈 import (특정 함수만 import)
-        from packing_kernel import Container, Box, BoxCreator
+        # 로컬 모듈 import (실제 존재하는 클래스만)
+        from packing_kernel import Container, Box
         print("✅ packing_kernel 로드 완료")
+        
+        from utils import boxes_generator
+        print("✅ utils 로드 완료")
         
         from train_maskable_ppo import make_env
         print("✅ make_env 로드 완료")
@@ -46,7 +49,6 @@ def minimal_train():
         
         print("✅ 환경 생성 완료")
         print(f"📦 컨테이너 크기: {env.unwrapped.container.size}")
-        print(f"🎲 박스 개수: {len(env.unwrapped.box_creator.box_set)}")
         
         # 환경 테스트
         obs, _ = env.reset()

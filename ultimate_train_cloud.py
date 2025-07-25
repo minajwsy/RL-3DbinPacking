@@ -36,7 +36,8 @@ def cloud_optuna_optimization():
         
         # 로컬 모듈 import
         from train_maskable_ppo import make_env
-        from packing_kernel import Container, Box, BoxCreator
+        from packing_kernel import Container, Box
+        from utils import boxes_generator
         print("✅ 로컬 모듈 로드")
         
         # 메모리 정리
