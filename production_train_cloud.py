@@ -28,18 +28,20 @@ def production_train_with_optuna():
         
         import numpy as np
         import optuna
+        import torch
         print("✅ 기본 모듈 로드")
         
         # 환경 경로 설정
         sys.path.append('src')
         
         # 로컬 모듈
-        from train_maskable_ppo import make_env, get_action_masks
+        from train_maskable_ppo import make_env
         from packing_kernel import Container, Box
         print("✅ 로컬 모듈 로드")
         
         # 강화학습 모듈
         from sb3_contrib import MaskablePPO
+        from sb3_contrib.common.maskable.utils import get_action_masks
         from stable_baselines3.common.monitor import Monitor
         print("✅ 강화학습 모듈 로드")
         
@@ -103,7 +105,7 @@ def production_train_with_optuna():
                 env = Monitor(env, f"logs/prod_train_trial_{trial.number}_{timestamp}.csv")
                 eval_env = Monitor(eval_env, f"logs/prod_eval_trial_{trial.number}_{timestamp}.csv")
                 
-                # PPO 모델 생성
+                # PPO 모델 생성 (수정됨)
                 model = MaskablePPO(
                     "MultiInputPolicy",
                     env,
@@ -121,7 +123,7 @@ def production_train_with_optuna():
                     seed=42 + trial.number,
                     policy_kwargs=dict(
                         net_arch=[256, 256, 128],
-                        activation_fn="relu",
+                        activation_fn=torch.nn.ReLU,  # 수정: 문자열 대신 torch 객체
                         share_features_extractor=True,
                     )
                 )
@@ -136,7 +138,7 @@ def production_train_with_optuna():
                 training_time = time.time() - start_time
                 print(f"   ⏱️ 학습 완료: {training_time:.1f}초")
                 
-                # 모델 평가
+                # 모델 평가 (수정된 get_action_masks 사용법)
                 total_rewards = []
                 total_utilizations = []
                 
@@ -147,7 +149,13 @@ def production_train_with_optuna():
                     step_count = 0
                     
                     while not done and step_count < 50:
-                        action_masks = get_action_masks(eval_env)
+                        # 수정: get_action_masks를 환경에서 직접 호출
+                        if hasattr(eval_env, 'action_masks'):
+                            action_masks = eval_env.action_masks()
+                        else:
+                            # 기본 마스크 (모든 액션 허용)
+                            action_masks = np.ones(eval_env.action_space.n, dtype=bool)
+                        
                         action, _ = model.predict(obs, action_masks=action_masks, deterministic=True)
                         obs, reward, terminated, truncated, info = eval_env.step(action)
                         episode_reward += reward
@@ -187,6 +195,8 @@ def production_train_with_optuna():
                 
             except Exception as e:
                 print(f"❌ Trial {trial.number} 오류: {e}")
+                import traceback
+                traceback.print_exc()
                 return 0.0
         
         # 최적화 실행
