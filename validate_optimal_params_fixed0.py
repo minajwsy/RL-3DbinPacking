@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-��� Optuna 최적 파라미터 검증 및 성능 평가 스크립트 (수정 버전 v2)
+��� Optuna 최적 파라미터 검증 및 성능 평가 스크립트 (수정 버전)  
 클라우드 프로덕션 환경에서 도출된 최적 파라미터를 적용하여 실제 성능 측정
 """
 
@@ -12,8 +12,11 @@ import time
 import json
 
 # === 환경 설정 및 등록 (가장 먼저 수행) ===
+# 클라우드 환경 최적화 설정
 os.environ['MPLBACKEND'] = 'Agg'
 warnings.filterwarnings("ignore")
+
+# 경로 설정
 sys.path.append('src')
 
 print("��� Optuna 최적 파라미터 검증 시작")
@@ -24,6 +27,7 @@ try:
     from gymnasium.envs.registration import register
     from packing_env import PackingEnv
     
+    # PackingEnv-v0 환경 등록
     if 'PackingEnv-v0' not in gym.envs.registry:
         register(id='PackingEnv-v0', entry_point='packing_env:PackingEnv')
         print("✅ PackingEnv-v0 환경 등록 완료")
@@ -31,13 +35,6 @@ try:
         print("✅ PackingEnv-v0 환경 이미 등록됨")
 except Exception as e:
     print(f"⚠️ 환경 등록 중 오류: {e}")
-
-# === 전역 import ===
-import numpy as np
-import gc
-from sb3_contrib import MaskablePPO
-from stable_baselines3.common.monitor import Monitor
-from stable_baselines3.common.callbacks import BaseCallback
 
 # === 최적 파라미터 (300 trials 결과) ===
 OPTIMAL_PARAMS = {
@@ -67,6 +64,7 @@ def create_env(container_size, num_boxes, num_visible_boxes=3, seed=42):
     """환경 생성 함수"""
     try:
         from utils import boxes_generator
+        import numpy as np
         
         # 박스 크기 생성
         box_sizes = boxes_generator(
@@ -129,11 +127,19 @@ def create_env(container_size, num_boxes, num_visible_boxes=3, seed=42):
 def validate_optimal_parameters():
     """최적 파라미터로 실제 PPO 학습 및 검증"""
     try:
-        print("��� 모듈 로딩 중...")
-        print("✅ 강화학습 모듈 로드")
+        import numpy as np
+        import gc
         
         # 메모리 최적화
         gc.collect()
+        
+        print("��� 모듈 로딩 중...")
+        
+        # 강화학습 모듈
+        from sb3_contrib import MaskablePPO
+        from stable_baselines3.common.monitor import Monitor
+        from stable_baselines3.common.callbacks import BaseCallback
+        print("✅ 강화학습 모듈 로드")
         
         # 실험 설정
         container_size = [10, 10, 10]
@@ -267,12 +273,15 @@ def train_and_evaluate(params, container_size, num_boxes, train_timesteps, exper
     
     # 메모리 정리
     del model
+    import gc
     gc.collect()
     
     return results
 
 def detailed_evaluation(model, eval_env, experiment_name, n_episodes=10):
     """상세한 모델 평가"""
+    import numpy as np
+    
     print(f"��� {experiment_name} 상세 평가 ({n_episodes} 에피소드)")
     
     episode_rewards = []
@@ -410,7 +419,7 @@ def save_validation_results(optimal_results, default_results):
     with open(results_file, 'w') as f:
         json.dump(validation_data, f, indent=2, default=str)
     
-    print(f"��� 검증 결과 저장: {results_file}")
+    print(f"�� 검증 결과 저장: {results_file}")
     
     # 간단한 요약 텍스트 파일도 생성
     summary_file = f"results/validation_summary_{timestamp}.txt"
