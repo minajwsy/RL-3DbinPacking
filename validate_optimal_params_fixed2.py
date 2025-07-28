@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-��� Optuna 최적 파라미터 검증 및 성능 평가 스크립트 (수정 버전 v3)
+��� Optuna 최적 파라미터 검증 및 성능 평가 스크립트 (수정 버전 v2)
 클라우드 프로덕션 환경에서 도출된 최적 파라미터를 적용하여 실제 성능 측정
 """
 
@@ -16,7 +16,7 @@ os.environ['MPLBACKEND'] = 'Agg'
 warnings.filterwarnings("ignore")
 sys.path.append('src')
 
-print("��� Optuna 최적 파라미터 검증 시작")
+print("��� Optuna 최적 파라미터 검증 시작")
 
 # === 환경 등록 ===
 try:
@@ -35,8 +35,6 @@ except Exception as e:
 # === 전역 import ===
 import numpy as np
 import gc
-import torch
-import torch.nn as nn
 from sb3_contrib import MaskablePPO
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.callbacks import BaseCallback
@@ -131,7 +129,7 @@ def create_env(container_size, num_boxes, num_visible_boxes=3, seed=42):
 def validate_optimal_parameters():
     """최적 파라미터로 실제 PPO 학습 및 검증"""
     try:
-        print("��� 모듈 로딩 중...")
+        print("��� 모듈 로딩 중...")
         print("✅ 강화학습 모듈 로드")
         
         # 메모리 최적화
@@ -142,13 +140,13 @@ def validate_optimal_parameters():
         num_boxes = 16
         train_timesteps = 10000
         
-        print(f"��� 실험 설정:")
+        print(f"��� 실험 설정:")
         print(f"   - 컨테이너 크기: {container_size}")
         print(f"   - 박스 개수: {num_boxes}")
         print(f"   - 학습 스텝: {train_timesteps:,}")
         
         # === 최적 파라미터로 학습 ===
-        print("\n��� === 최적 파라미터 학습 시작 ===")
+        print("\n��� === 최적 파라미터 학습 시작 ===")
         optimal_results = train_and_evaluate(
             params=OPTIMAL_PARAMS,
             container_size=container_size,
@@ -158,7 +156,7 @@ def validate_optimal_parameters():
         )
         
         # === 기본 파라미터로 학습 (비교용) ===
-        print("\n��� === 기본 파라미터 학습 시작 (비교용) ===")
+        print("\n��� === 기본 파라미터 학습 시작 (비교용) ===")
         default_results = train_and_evaluate(
             params=DEFAULT_PARAMS,
             container_size=container_size,
@@ -168,7 +166,7 @@ def validate_optimal_parameters():
         )
         
         # === 결과 비교 및 분석 ===
-        print("\n��� === 성능 비교 분석 ===")
+        print("\n��� === 성능 비교 분석 ===")
         compare_results(optimal_results, default_results)
         
         # === 상세 결과 저장 ===
@@ -184,7 +182,7 @@ def validate_optimal_parameters():
 
 def train_and_evaluate(params, container_size, num_boxes, train_timesteps, experiment_name):
     """파라미터를 사용한 학습 및 평가"""
-    print(f"��� {experiment_name} 실험 시작")
+    print(f"��� {experiment_name} 실험 시작")
     print(f"파라미터: {json.dumps(params, indent=2)}")
     
     # 환경 생성
@@ -211,7 +209,7 @@ def train_and_evaluate(params, container_size, num_boxes, train_timesteps, exper
                 print(f"   진행률: {progress:.1f}% ({self.num_timesteps:,}/{train_timesteps:,})")
             return True
     
-    # PPO 모델 생성 (activation_fn 수정)
+    # PPO 모델 생성
     model = MaskablePPO(
         "MultiInputPolicy",
         env,
@@ -229,13 +227,13 @@ def train_and_evaluate(params, container_size, num_boxes, train_timesteps, exper
         seed=42,
         policy_kwargs=dict(
             net_arch=[256, 256, 128],
-            activation_fn=nn.ReLU,  # 문자열 대신 PyTorch 클래스 사용
+            activation_fn="relu",
         )
     )
     
     # 학습 시작
     start_time = time.time()
-    print(f"��� 학습 시작: {train_timesteps:,} 스텝")
+    print(f"��� 학습 시작: {train_timesteps:,} 스텝")
     
     callback = ProgressCallback()
     model.learn(total_timesteps=train_timesteps, callback=callback, progress_bar=False)
@@ -247,10 +245,10 @@ def train_and_evaluate(params, container_size, num_boxes, train_timesteps, exper
     os.makedirs('models', exist_ok=True)
     model_path = f"models/validate_{experiment_name}_{timestamp}"
     model.save(model_path)
-    print(f"��� 모델 저장: {model_path}")
+    print(f"��� 모델 저장: {model_path}")
     
     # === 상세 평가 수행 ===
-    print("��� 상세 평가 시작...")
+    print("��� 상세 평가 시작...")
     evaluation_results = detailed_evaluation(model, eval_env, experiment_name)
     
     # 환경 정리
@@ -275,7 +273,7 @@ def train_and_evaluate(params, container_size, num_boxes, train_timesteps, exper
 
 def detailed_evaluation(model, eval_env, experiment_name, n_episodes=10):
     """상세한 모델 평가"""
-    print(f"��� {experiment_name} 상세 평가 ({n_episodes} 에피소드)")
+    print(f"��� {experiment_name} 상세 평가 ({n_episodes} 에피소드)")
     
     episode_rewards = []
     episode_lengths = []
@@ -351,7 +349,7 @@ def detailed_evaluation(model, eval_env, experiment_name, n_episodes=10):
 
 def compare_results(optimal_results, default_results):
     """최적 파라미터와 기본 파라미터 결과 비교"""
-    print("��� === 상세 성능 비교 ===")
+    print("��� === 상세 성능 비교 ===")
     
     metrics = [
         ('평균 보상', 'mean_reward', '.4f'),
@@ -379,9 +377,9 @@ def compare_results(optimal_results, default_results):
     combined_improvement = ((optimal_results['combined_score'] - default_results['combined_score']) / 
                            default_results['combined_score'] * 100)
     
-    print(f"\n��� 종합 평가:")
+    print(f"\n��� 종합 평가:")
     if combined_improvement > 10:
-        print(f"��� 최적 파라미터가 {combined_improvement:.1f}% 우수한 성능을 보입니다!")
+        print(f"��� 최적 파라미터가 {combined_improvement:.1f}% 우수한 성능을 보입니다!")
     elif combined_improvement > 0:
         print(f"✅ 최적 파라미터가 {combined_improvement:.1f}% 개선된 성능을 보입니다.")
     else:
@@ -412,7 +410,7 @@ def save_validation_results(optimal_results, default_results):
     with open(results_file, 'w') as f:
         json.dump(validation_data, f, indent=2, default=str)
     
-    print(f"��� 검증 결과 저장: {results_file}")
+    print(f"��� 검증 결과 저장: {results_file}")
     
     # 간단한 요약 텍스트 파일도 생성
     summary_file = f"results/validation_summary_{timestamp}.txt"
@@ -436,7 +434,7 @@ def save_validation_results(optimal_results, default_results):
         improvement = validation_data['improvement']['combined_score']
         f.write(f"종합 개선율: {improvement:.1f}%\n")
     
-    print(f"��� 요약 저장: {summary_file}")
+    print(f"��� 요약 저장: {summary_file}")
 
 def main():
     import argparse
@@ -449,7 +447,7 @@ def main():
         args = parser.parse_args()
         
         if args.validate:
-            print("��� Optuna 최적 파라미터 검증 모드")
+            print("��� Optuna 최적 파라미터 검증 모드")
             print(f"학습 스텝: {args.timesteps:,}")
             
             success = validate_optimal_parameters()
@@ -458,10 +456,10 @@ def main():
             else:
                 print("\n❌ 검증 실패!")
         else:
-            print("��� 사용법:")
+            print("��� 사용법:")
             print("  python validate_optimal_params_fixed.py --validate")
             print("  python validate_optimal_params_fixed.py --validate --timesteps 15000")
-            print("\n��� 최적 파라미터 (300 trials):")
+            print("\n��� 최적 파라미터 (300 trials):")
             for key, value in OPTIMAL_PARAMS.items():
                 if 'learning_rate' in key:
                     print(f"  {key}: {value:.6e}")
