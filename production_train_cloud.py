@@ -65,12 +65,14 @@ def production_train_with_optuna():
             """실제 PPO 학습을 포함한 목적 함수"""
             try:
                 # 하이퍼파라미터 제안 (최적화된 범위)
-                learning_rate = trial.suggest_float('learning_rate', 1e-6, 5e-4, log=True)
-                n_steps = trial.suggest_categorical('n_steps', [512, 1024, 2048])
-                batch_size = trial.suggest_categorical('batch_size', [64, 128, 256])
-                n_epochs = trial.suggest_int('n_epochs', 5, 15)
-                clip_range = trial.suggest_float('clip_range', 0.1, 0.3)
-                ent_coef = trial.suggest_float('ent_coef', 1e-4, 1e-2, log=True)
+                learning_rate = trial.suggest_float('learning_rate', 1e-6, 1e-3, log=True)
+                n_steps = trial.suggest_categorical('n_steps', [512, 1024, 2048, 4096])
+                batch_size = trial.suggest_categorical('batch_size', [32, 64, 128, 256, 512])
+                n_epochs = trial.suggest_int('n_epochs', 3, 15)
+                clip_range = trial.suggest_float('clip_range', 0.1, 0.4)
+                ent_coef = trial.suggest_float('ent_coef', 1e-4, 1e-1, log=True)
+                vf_coef = trial.suggest_float('vf_coef', 0.1, 1)
+                gae_lambda = trial.suggest_float('gae_lambda', 0.9, 0.99)
                 
                 print(f"🔬 Trial {trial.number}: lr={learning_rate:.6f}, steps={n_steps}, batch={batch_size}")
                 
@@ -113,11 +115,11 @@ def production_train_with_optuna():
                     n_steps=n_steps,
                     batch_size=batch_size,
                     n_epochs=n_epochs,
-                    gamma=0.99,
-                    gae_lambda=0.95,
                     clip_range=clip_range,
                     ent_coef=ent_coef,
-                    vf_coef=0.5,
+                    vf_coef=vf_coef,
+                    gae_lambda=gae_lambda,
+                    gamma=0.99,
                     max_grad_norm=0.5,
                     verbose=0,
                     seed=42 + trial.number,
