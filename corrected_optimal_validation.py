@@ -56,7 +56,7 @@ ENHANCED_OPTIMAL = {
 
 # 기본 파라미터
 DEFAULT_PARAMS = {
-    'learning_rate': 3e-4,
+    'learning_rate': 9e-4,  # 3e-4
     'n_steps': 256,
     'batch_size': 32,
     'n_epochs': 3,
