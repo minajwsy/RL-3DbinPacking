@@ -66,6 +66,37 @@ DEFAULT_PARAMS = {
     'gae_lambda': 0.95
 }
 
+# 이전에 시도하지 않은 아키텍처들
+network_architectures = [
+    [64, 64],        # 경량화
+    [128, 128],      # 기존
+    [256, 256],      # 확장
+    [128, 128, 64],  # 점진적 감소
+    [256, 128, 64],  # 더 큰 점진적 감소
+    [512, 256],      # 큰 시작 + 압축
+]
+
+# 고급 PPO 파라미터 조정
+advanced_params = {
+    # 적응적 학습률 (학습 진행에 따라 감소)
+    'adaptive_lr': lambda progress: max(
+        base_lr * 0.1, 
+        base_lr * (1 - progress * 0.8)
+    ),
+    
+    # 클리핑 전략
+    'clip_range': [0.15, 0.2, 0.25, 0.3],
+    'clip_range_vf': [None, 0.2, 0.3],  # Value function 클리핑
+    
+    # 엔트로피와 가치 함수 균형
+    'ent_coef': [0.005, 0.01, 0.02, 0.03],
+    'vf_coef': [0.3, 0.5, 0.7, 1.0],
+    
+    # GAE 파라미터
+    'gae_lambda': [0.9, 0.95, 0.98, 0.99],
+    'gamma': [0.99, 0.995, 0.999],
+}
+
 def create_environment(container_size, num_boxes, seed):
     """환경 생성"""
     try:
