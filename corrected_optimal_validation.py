@@ -97,6 +97,43 @@ advanced_params = {
     'gamma': [0.99, 0.995, 0.999],
 }
 
+# 이전 성공 설정 완전 재현
+base_config = {
+    'container_size': [8, 8, 8],
+    'num_boxes': 6,
+    'timesteps': 15000,  # 25% 증가
+    'eval_episodes': 20,  # 더 정확한 평가
+    'net_arch': [256, 256],  # 더 큰 네트워크
+}
+
+optimal_params = {
+    'learning_rate': 2.5e-4,  # 이전 최적값
+    'n_steps': 512,           # 이전 최적값  
+    'batch_size': 64,         # 이전 최적값
+    'n_epochs': 4,            # 약간 증가
+    'clip_range': 0.2,        # 표준값
+    'ent_coef': 0.01,         # 표준값
+    'vf_coef': 0.5,           # 표준값
+    'gae_lambda': 0.95,       # 표준값
+}
+
+# 성능 복원 후 단계적 확장
+complexity_progression = [
+    ([8, 8, 8], 6),   # 1단계: 기본 복원
+    ([8, 8, 8], 8),   # 2단계: 박스 증가
+    ([10, 10, 10], 8), # 3단계: 컨테이너 확장  
+    ([10, 10, 10], 12), # 4단계: 목표 설정
+    ([10, 10, 10], 16), # 5단계: 최종 목표
+]
+
+# 각 단계별 세밀 최적화
+advanced_optimization = {
+    'adaptive_lr': True,  # 적응적 학습률
+    'early_stopping': True,  # 조기 종료
+    'multiple_seeds': [42, 123, 456],  # 재현성 확보
+    'extended_eval': 50,  # 더 긴 평가
+}
+
 def create_environment(container_size, num_boxes, seed):
     """환경 생성"""
     try:
