@@ -72,6 +72,37 @@ def get_env_info(env):
         print(f"⚠️ 환경 정보 가져오기 실패: {e}")
         return [10, 10, 10], 12
 
+def calculate_utilization_and_items(env):
+    """활용률과 배치된 박스 개수 계산 (기존 프로젝트 방식)"""
+    try:
+        # 래퍼들을 벗겨내어 실제 PackingEnv에 접근
+        unwrapped_env = env
+        while hasattr(unwrapped_env, 'env'):
+            unwrapped_env = unwrapped_env.env
+        
+        if hasattr(unwrapped_env, 'container'):
+            # 배치된 박스들의 볼륨 계산
+            placed_volume = 0
+            placed_count = 0
+            
+            for box in unwrapped_env.container.boxes:
+                if hasattr(box, 'position') and box.position is not None:
+                    # position이 [-1, -1, -1]이 아닌 경우만 배치된 것으로 간주
+                    if not (box.position[0] == -1 and box.position[1] == -1 and box.position[2] == -1):
+                        placed_volume += box.volume
+                        placed_count += 1
+            
+            # 컨테이너 전체 볼륨
+            container_volume = unwrapped_env.container.volume
+            utilization = placed_volume / container_volume if container_volume > 0 else 0.0
+            
+            return utilization, placed_count
+        else:
+            return 0.0, 0
+    except Exception as e:
+        print(f"⚠️ 활용률 계산 실패: {e}")
+        return 0.0, 0
+
 class EnhancedOptimizer:
     """Phase 4: 정밀 최적화 클래스"""
     
@@ -105,7 +136,7 @@ class EnhancedOptimizer:
         
     def create_enhanced_environment(self, num_boxes: int = 12, container_size: List[int] = [10, 10, 10], 
                                   enhanced_reward: bool = True, seed: int = 42) -> gym.Env:
-        """향상된 환경 생성"""
+        """향상된 환경 생성 (기존 프로젝트 방식 적용)"""
         try:
             print(f"생성된 박스 개수: {num_boxes}")
             print(f"컨테이너 크기: {container_size}")
@@ -137,16 +168,25 @@ class EnhancedOptimizer:
                 env = ImprovedRewardWrapper(env)
                 print("개선된 보상 래퍼 적용됨")
                 
-            # Action Masker 적용
+            # Action Masker 적용 (기존 프로젝트 방식)
             def get_action_masks(env):
                 """액션 마스크 생성"""
                 try:
-                    if hasattr(env, 'action_masks'):
-                        return env.action_masks()
+                    # 래퍼들을 벗겨내어 실제 PackingEnv에 접근
+                    unwrapped_env = env
+                    while hasattr(unwrapped_env, 'env'):
+                        unwrapped_env = unwrapped_env.env
+                    
+                    if hasattr(unwrapped_env, 'action_masks'):
+                        masks = unwrapped_env.action_masks()
+                        if isinstance(masks, list):
+                            return np.array(masks, dtype=bool)
+                        return masks
                     else:
                         # 기본적으로 모든 액션 허용
                         return np.ones(env.action_space.n, dtype=bool)
-                except:
+                except Exception as e:
+                    print(f"⚠️ 액션 마스크 생성 실패: {e}")
                     return np.ones(env.action_space.n, dtype=bool)
             
             env = ActionMasker(env, get_action_masks)
@@ -273,7 +313,7 @@ class EnhancedOptimizer:
     
     def train_and_evaluate(self, params: Dict, name: str, timesteps: int = 35000, 
                           eval_episodes: int = 25, enhanced_reward: bool = True) -> Dict[str, Any]:
-        """모델 훈련 및 평가"""
+        """모델 훈련 및 평가 (기존 프로젝트 방식 적용)"""
         print(f"\n🔧 {name} 최적화 중...")
         
         # 환경 생성 (훈련용)
@@ -307,8 +347,8 @@ class EnhancedOptimizer:
         training_time = time.time() - start_time
         print(f"⏱️ {name} 학습 완료: {training_time:.1f}초")
         
-        # 평가
-        print(f"🔍 {name} 평가 시작 ({eval_episodes} 에피소드, 최대 50 스텝)")
+        # 평가 (기존 프로젝트 방식)
+        print(f"🔍 {name} 평가 시작 ({eval_episodes} 에피소드, 최대 25 스텝)")
         
         rewards = []
         utilizations = []
@@ -317,7 +357,6 @@ class EnhancedOptimizer:
         for i in range(eval_episodes):
             eval_env = self.create_enhanced_environment(enhanced_reward=enhanced_reward, seed=100 + i * 5)
             container_size, box_count = get_env_info(eval_env)
-            print(f"✅ 환경 생성 성공: 컨테이너{container_size}, 박스{box_count}개")
             
             # 환경 리셋 (seed 포함)
             obs = eval_env.reset(seed=100 + i * 5)
@@ -326,21 +365,24 @@ class EnhancedOptimizer:
                 
             episode_reward = 0
             step_count = 0
-            max_steps = 50
+            max_steps = 25  # 기존 프로젝트와 동일
             
             while step_count < max_steps:
-                action_masks = eval_env.action_masks()
-                action, _ = model.predict(obs, action_masks=action_masks, deterministic=True)
-                obs, reward, terminated, truncated, info = eval_env.step(action)
-                episode_reward += reward
-                step_count += 1
-                
-                if terminated or truncated:
+                try:
+                    # 기존 프로젝트 방식: deterministic=False, action_masks 사용 안 함
+                    action, _ = model.predict(obs, deterministic=False)
+                    obs, reward, terminated, truncated, info = eval_env.step(action)
+                    episode_reward += reward
+                    step_count += 1
+                    
+                    if terminated or truncated:
+                        break
+                except Exception as e:
+                    print(f"⚠️ 평가 중 오류: {e}")
                     break
             
-            # 통계 수집
-            final_utilization = info.get('utilization', 0.0)
-            placement_count = info.get('num_items', 0)
+            # 활용률과 배치 개수 계산 (기존 프로젝트 방식)
+            final_utilization, placement_count = calculate_utilization_and_items(eval_env)
             
             rewards.append(episode_reward)
             utilizations.append(final_utilization)
@@ -364,8 +406,8 @@ class EnhancedOptimizer:
         success_count = sum(1 for p in placements if p >= 5)
         success_rate = success_count / eval_episodes
         
-        # 종합 점수 계산 (Phase 3와 동일한 공식)
-        combined_score = (mean_reward * 2.0) + (mean_utilization * 100 * 0.3) + (success_rate * 20)
+        # 종합 점수 계산 (기존 프로젝트 방식 적용)
+        combined_score = mean_reward * 0.3 + mean_utilization * 100 * 0.7
         
         # 결과 출력
         print(f"📊 {name} 최종 결과:")
@@ -582,19 +624,14 @@ class EnhancedRewardWrapper(gym.RewardWrapper):
         super().__init__(env)
         self.previous_utilization = 0.0
         self.consecutive_placements = 0
-        self.env._last_info = {}  # info 저장용
         
     def reset(self, **kwargs):
         self.previous_utilization = 0.0
         self.consecutive_placements = 0
-        self.env._last_info = {}
         return self.env.reset(**kwargs)
     
     def step(self, action):
         obs, reward, terminated, truncated, info = self.env.step(action)
-        
-        # info 저장
-        self.env._last_info = info
         
         # 강화된 보상 계산
         enhanced_reward = self.reward(reward)
@@ -602,10 +639,8 @@ class EnhancedRewardWrapper(gym.RewardWrapper):
         return obs, enhanced_reward, terminated, truncated, info
         
     def reward(self, reward):
-        # 기본 정보 가져오기
-        info = getattr(self.env, '_last_info', {})
-        current_utilization = info.get('utilization', 0.0)
-        placement_count = info.get('num_items', 0)
+        # 현재 활용률과 배치 개수 계산
+        current_utilization, placement_count = calculate_utilization_and_items(self.env)
         
         # 1. 기본 보상
         enhanced_reward = reward
