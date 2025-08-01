@@ -45,6 +45,33 @@ except ImportError as e:
     print("src 폴더와 필요한 모듈들이 있는지 확인하세요.")
     sys.exit(1)
 
+def get_env_info(env):
+    """환경 정보를 안전하게 가져오는 함수"""
+    try:
+        # 래퍼들을 벗겨내어 실제 PackingEnv에 접근
+        unwrapped_env = env
+        while hasattr(unwrapped_env, 'env'):
+            unwrapped_env = unwrapped_env.env
+        
+        # 컨테이너 크기
+        if hasattr(unwrapped_env, 'container') and hasattr(unwrapped_env.container, 'size'):
+            container_size = unwrapped_env.container.size
+        else:
+            container_size = [10, 10, 10]  # 기본값
+        
+        # 박스 개수
+        if hasattr(unwrapped_env, 'initial_boxes'):
+            box_count = len(unwrapped_env.initial_boxes)
+        elif hasattr(unwrapped_env, 'num_initial_boxes'):
+            box_count = unwrapped_env.num_initial_boxes
+        else:
+            box_count = 12  # 기본값
+        
+        return container_size, box_count
+    except Exception as e:
+        print(f"⚠️ 환경 정보 가져오기 실패: {e}")
+        return [10, 10, 10], 12
+
 class EnhancedOptimizer:
     """Phase 4: 정밀 최적화 클래스"""
     
@@ -251,7 +278,8 @@ class EnhancedOptimizer:
         
         # 환경 생성 (훈련용)
         env = self.create_enhanced_environment(enhanced_reward=enhanced_reward, seed=42)
-        print(f"✅ 환경 생성 성공: 컨테이너{env.unwrapped.container_size}, 박스{len(env.unwrapped.box_sizes)}개")
+        container_size, box_count = get_env_info(env)
+        print(f"✅ 환경 생성 성공: 컨테이너{container_size}, 박스{box_count}개")
         
         # 모델 생성 - MaskablePPO 사용
         model = MaskablePPO(
@@ -288,7 +316,8 @@ class EnhancedOptimizer:
         
         for i in range(eval_episodes):
             eval_env = self.create_enhanced_environment(enhanced_reward=enhanced_reward, seed=100 + i * 5)
-            print(f"✅ 환경 생성 성공: 컨테이너{eval_env.unwrapped.container_size}, 박스{len(eval_env.unwrapped.box_sizes)}개")
+            container_size, box_count = get_env_info(eval_env)
+            print(f"✅ 환경 생성 성공: 컨테이너{container_size}, 박스{box_count}개")
             
             # 환경 리셋 (seed 포함)
             obs = eval_env.reset(seed=100 + i * 5)
@@ -434,7 +463,7 @@ class EnhancedOptimizer:
             best_result = sorted_results[0][1]
             target_achievement = best_score / self.target_score * 100
             
-            print(f"\n�� 최고 성능: {best_score:.3f}점 ({best_config})")
+            print(f"\n🏆 최고 성능: {best_score:.3f}점 ({best_config})")
             print(f"📈 목표 달성도: {target_achievement:.1f}% (목표 {self.target_score} 대비)")
             
             if best_score >= self.target_score:
