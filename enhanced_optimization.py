@@ -14,21 +14,32 @@ import numpy as np
 import pandas as pd
 from datetime import datetime
 from typing import Dict, List, Tuple, Any, Optional
+import warnings
+
+# 환경 설정
+os.environ['CUDA_VISIBLE_DEVICES'] = ''
+os.environ['MPLBACKEND'] = 'Agg'
+warnings.filterwarnings("ignore")
+
+# src 폴더를 path에 추가
+sys.path.append('src')
+
 import gymnasium as gym
+from gymnasium.envs.registration import register
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv, VecMonitor
 from stable_baselines3.common.callbacks import BaseCallback
+from sb3_contrib import MaskablePPO
+from sb3_contrib.common.wrappers import ActionMasker
 import torch
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# 프로젝트 루트 추가
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
 try:
-    from src.envs import PackingEnv, ImprovedRewardWrapper, ActionMaskWrapper
-    from src.agents import create_ppo_agent
-    from src.device_utils import get_device_info, optimize_for_device
+    from packing_env import PackingEnv
+    from train_maskable_ppo import ImprovedRewardWrapper
+    from utils import boxes_generator
+    print("✅ 모든 모듈 import 성공")
 except ImportError as e:
     print(f"❌ Import 오류: {e}")
     print("src 폴더와 필요한 모듈들이 있는지 확인하세요.")
@@ -66,20 +77,32 @@ class EnhancedOptimizer:
         print(f"🏆 목표: {self.target_score}점 ({self.improvement_needed:.1%} 개선 필요)")
         
     def create_enhanced_environment(self, num_boxes: int = 12, container_size: List[int] = [10, 10, 10], 
-                                  enhanced_reward: bool = True) -> gym.Env:
+                                  enhanced_reward: bool = True, seed: int = 42) -> gym.Env:
         """향상된 환경 생성"""
         try:
             print(f"생성된 박스 개수: {num_boxes}")
             print(f"컨테이너 크기: {container_size}")
             
-            env = gym.make('PackingEnv-v0', 
-                          container_size=container_size,
-                          item_set_size=num_boxes,
-                          data_name="small_set",
-                          reward_type="C+P+S-add-min",
-                          reward_params={})
+            # PackingEnv 등록 (이미 등록되어 있지 않은 경우)
+            if 'PackingEnv-v0' not in gym.envs.registry:
+                register(id='PackingEnv-v0', entry_point='packing_env:PackingEnv')
+            
+            # 박스 생성
+            box_sizes = boxes_generator(container_size, num_boxes, seed)
+            
+            # 환경 생성
+            env = gym.make(
+                "PackingEnv-v0",
+                container_size=container_size,
+                box_sizes=box_sizes,
+                num_visible_boxes=min(3, num_boxes),
+                render_mode=None,
+                random_boxes=False,
+                only_terminal_reward=False,
+            )
             print("환경 생성 성공: PackingEnv-v0")
             
+            # 보상 래퍼 적용
             if enhanced_reward:
                 env = EnhancedRewardWrapper(env)
                 print("강화된 보상 래퍼 적용됨")
@@ -87,8 +110,24 @@ class EnhancedOptimizer:
                 env = ImprovedRewardWrapper(env)
                 print("개선된 보상 래퍼 적용됨")
                 
-            env = ActionMaskWrapper(env)
+            # Action Masker 적용
+            def get_action_masks(env):
+                """액션 마스크 생성"""
+                try:
+                    if hasattr(env, 'action_masks'):
+                        return env.action_masks()
+                    else:
+                        # 기본적으로 모든 액션 허용
+                        return np.ones(env.action_space.n, dtype=bool)
+                except:
+                    return np.ones(env.action_space.n, dtype=bool)
+            
+            env = ActionMasker(env, get_action_masks)
             print("액션 마스킹 래퍼 적용됨")
+            
+            # 시드 설정
+            env.seed(seed)
+            print(f"시드 설정 완료: {seed}")
             
             return env
             
@@ -110,7 +149,7 @@ class EnhancedOptimizer:
                 'ent_coef': 0.005,         # 탐색 감소
                 'vf_coef': 0.5,
                 'gae_lambda': 0.98,        # 장기 보상 중시
-                'net_arch': [256, 128, 64]
+                'net_arch': [dict(pi=[256, 128, 64], vf=[256, 128, 64])]
             },
             'stability_balanced': {
                 'learning_rate': 1.3e-04,
@@ -121,7 +160,7 @@ class EnhancedOptimizer:
                 'ent_coef': 0.008,
                 'vf_coef': 0.5,
                 'gae_lambda': 0.96,
-                'net_arch': [256, 128, 64]
+                'net_arch': [dict(pi=[256, 128, 64], vf=[256, 128, 64])]
             }
         }
         
@@ -136,7 +175,7 @@ class EnhancedOptimizer:
                 'ent_coef': 0.01,
                 'vf_coef': 0.5,
                 'gae_lambda': 0.95,
-                'net_arch': [512, 256, 128]  # 더 큰 첫 레이어
+                'net_arch': [dict(pi=[512, 256, 128], vf=[512, 256, 128])]  # 더 큰 첫 레이어
             },
             'arch_deep': {
                 'learning_rate': 1.4e-04,
@@ -147,7 +186,7 @@ class EnhancedOptimizer:
                 'ent_coef': 0.01,
                 'vf_coef': 0.5,
                 'gae_lambda': 0.95,
-                'net_arch': [256, 256, 128, 64]  # 추가 레이어
+                'net_arch': [dict(pi=[256, 256, 128, 64], vf=[256, 256, 128, 64])]  # 추가 레이어
             },
             'arch_balanced': {
                 'learning_rate': 1.5e-04,
@@ -158,7 +197,7 @@ class EnhancedOptimizer:
                 'ent_coef': 0.01,
                 'vf_coef': 0.5,
                 'gae_lambda': 0.95,
-                'net_arch': [384, 192, 96]  # 균형 잡힌 감소
+                'net_arch': [dict(pi=[384, 192, 96], vf=[384, 192, 96])]  # 균형 잡힌 감소
             },
             'arch_reinforced': {
                 'learning_rate': 1.5e-04,
@@ -169,7 +208,7 @@ class EnhancedOptimizer:
                 'ent_coef': 0.01,
                 'vf_coef': 0.5,
                 'gae_lambda': 0.95,
-                'net_arch': [256, 128, 128, 64]  # 중간 레이어 강화
+                'net_arch': [dict(pi=[256, 128, 128, 64], vf=[256, 128, 128, 64])]  # 중간 레이어 강화
             }
         }
         
@@ -184,7 +223,7 @@ class EnhancedOptimizer:
                 'ent_coef': 0.003,         # 최소 탐색
                 'vf_coef': 0.6,            # 가치 함수 중시
                 'gae_lambda': 0.99,        # 최대 장기 보상
-                'net_arch': [256, 128, 64]
+                'net_arch': [dict(pi=[256, 128, 64], vf=[256, 128, 64])]
             },
             'opt_aggressive': {
                 'learning_rate': 1.8e-04,  # 적극적 학습
@@ -195,7 +234,7 @@ class EnhancedOptimizer:
                 'ent_coef': 0.02,          # 많은 탐색
                 'vf_coef': 0.4,
                 'gae_lambda': 0.92,
-                'net_arch': [256, 128, 64]
+                'net_arch': [dict(pi=[256, 128, 64], vf=[256, 128, 64])]
             }
         }
         
@@ -214,16 +253,12 @@ class EnhancedOptimizer:
         
         # 환경 생성
         env = self.create_enhanced_environment(enhanced_reward=enhanced_reward)
-        env.seed(42)
         print(f"✅ 환경 생성 성공: 컨테이너{env.unwrapped.container_size}, 박스{env.unwrapped.item_set_size}개")
         
-        # 모델 생성
-        vec_env = DummyVecEnv([lambda: env])
-        vec_env = VecMonitor(vec_env)
-        
-        model = PPO(
-            'MlpPolicy',
-            vec_env,
+        # 모델 생성 - MaskablePPO 사용
+        model = MaskablePPO(
+            'MultiInputPolicy',
+            env,
             learning_rate=params['learning_rate'],
             n_steps=params['n_steps'],
             batch_size=params['batch_size'],
@@ -249,23 +284,25 @@ class EnhancedOptimizer:
         # 평가
         print(f"🔍 {name} 평가 시작 ({eval_episodes} 에피소드, 최대 50 스텝)")
         
-        eval_env = self.create_enhanced_environment(enhanced_reward=enhanced_reward)
-        
         rewards = []
         utilizations = []
         placements = []
         
         for i in range(eval_episodes):
-            eval_env.seed(100 + i * 5)
+            eval_env = self.create_enhanced_environment(enhanced_reward=enhanced_reward, seed=100 + i * 5)
             print(f"✅ 환경 생성 성공: 컨테이너{eval_env.unwrapped.container_size}, 박스{eval_env.unwrapped.item_set_size}개")
             
-            obs, _ = eval_env.reset()
+            obs = eval_env.reset()
+            if isinstance(obs, tuple):
+                obs = obs[0]
+                
             episode_reward = 0
             step_count = 0
             max_steps = 50
             
             while step_count < max_steps:
-                action, _ = model.predict(obs, deterministic=True)
+                action_masks = eval_env.action_masks()
+                action, _ = model.predict(obs, action_masks=action_masks, deterministic=True)
                 obs, reward, terminated, truncated, info = eval_env.step(action)
                 episode_reward += reward
                 step_count += 1
@@ -284,6 +321,8 @@ class EnhancedOptimizer:
             # 주요 에피소드만 출력
             if i < 6 or i in [10, 15, 20] or i == eval_episodes - 1:
                 print(f"   에피소드 {i+1}: 보상={episode_reward:.3f}, 활용률={final_utilization:.1%}, 박스={placement_count}개")
+            
+            eval_env.close()
         
         # 결과 계산
         mean_reward = np.mean(rewards)
@@ -309,8 +348,7 @@ class EnhancedOptimizer:
         print(f"   종합 점수: {combined_score:.3f}")
         
         # 환경 정리
-        eval_env.close()
-        vec_env.close()
+        env.close()
         
         return {
             'mean_reward': mean_reward,
@@ -514,6 +552,11 @@ class EnhancedRewardWrapper(gym.RewardWrapper):
         super().__init__(env)
         self.previous_utilization = 0.0
         self.consecutive_placements = 0
+        
+    def reset(self, **kwargs):
+        self.previous_utilization = 0.0
+        self.consecutive_placements = 0
+        return self.env.reset(**kwargs)
         
     def reward(self, reward):
         # 기본 정보 가져오기
