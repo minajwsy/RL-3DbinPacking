@@ -125,8 +125,6 @@ class EnhancedOptimizer:
             env = ActionMasker(env, get_action_masks)
             print("액션 마스킹 래퍼 적용됨")
             
-            # 시드 설정
-            env.seed(seed)
             print(f"시드 설정 완료: {seed}")
             
             return env
@@ -251,9 +249,9 @@ class EnhancedOptimizer:
         """모델 훈련 및 평가"""
         print(f"\n🔧 {name} 최적화 중...")
         
-        # 환경 생성
-        env = self.create_enhanced_environment(enhanced_reward=enhanced_reward)
-        print(f"✅ 환경 생성 성공: 컨테이너{env.unwrapped.container_size}, 박스{env.unwrapped.item_set_size}개")
+        # 환경 생성 (훈련용)
+        env = self.create_enhanced_environment(enhanced_reward=enhanced_reward, seed=42)
+        print(f"✅ 환경 생성 성공: 컨테이너{env.unwrapped.container_size}, 박스{len(env.unwrapped.box_sizes)}개")
         
         # 모델 생성 - MaskablePPO 사용
         model = MaskablePPO(
@@ -290,9 +288,10 @@ class EnhancedOptimizer:
         
         for i in range(eval_episodes):
             eval_env = self.create_enhanced_environment(enhanced_reward=enhanced_reward, seed=100 + i * 5)
-            print(f"✅ 환경 생성 성공: 컨테이너{eval_env.unwrapped.container_size}, 박스{eval_env.unwrapped.item_set_size}개")
+            print(f"✅ 환경 생성 성공: 컨테이너{eval_env.unwrapped.container_size}, 박스{len(eval_env.unwrapped.box_sizes)}개")
             
-            obs = eval_env.reset()
+            # 환경 리셋 (seed 포함)
+            obs = eval_env.reset(seed=100 + i * 5)
             if isinstance(obs, tuple):
                 obs = obs[0]
                 
@@ -409,6 +408,8 @@ class EnhancedOptimizer:
                 
             except Exception as e:
                 print(f"❌ {name} 실행 중 오류: {e}")
+                import traceback
+                traceback.print_exc()
                 continue
         
         total_time = time.time() - total_start_time
@@ -433,7 +434,7 @@ class EnhancedOptimizer:
             best_result = sorted_results[0][1]
             target_achievement = best_score / self.target_score * 100
             
-            print(f"\n🏆 최고 성능: {best_score:.3f}점 ({best_config})")
+            print(f"\n�� 최고 성능: {best_score:.3f}점 ({best_config})")
             print(f"📈 목표 달성도: {target_achievement:.1f}% (목표 {self.target_score} 대비)")
             
             if best_score >= self.target_score:
@@ -552,11 +553,24 @@ class EnhancedRewardWrapper(gym.RewardWrapper):
         super().__init__(env)
         self.previous_utilization = 0.0
         self.consecutive_placements = 0
+        self.env._last_info = {}  # info 저장용
         
     def reset(self, **kwargs):
         self.previous_utilization = 0.0
         self.consecutive_placements = 0
+        self.env._last_info = {}
         return self.env.reset(**kwargs)
+    
+    def step(self, action):
+        obs, reward, terminated, truncated, info = self.env.step(action)
+        
+        # info 저장
+        self.env._last_info = info
+        
+        # 강화된 보상 계산
+        enhanced_reward = self.reward(reward)
+        
+        return obs, enhanced_reward, terminated, truncated, info
         
     def reward(self, reward):
         # 기본 정보 가져오기
