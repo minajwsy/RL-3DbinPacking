@@ -1,0 +1,306 @@
+{
+  "timestamp": "20250803_233243",
+  "phase": "phase4_enhanced_optimization",
+  "focus": "all",
+  "timesteps": 35000,
+  "target_score": 18.57,
+  "phase3_baseline": 16.116,
+  "best_score": 19.576242210539455,
+  "best_config": "arch_reinforced",
+  "target_achievement": 105.41864410629755,
+  "total_time_minutes": 181.14044316212338,
+  "results": {
+    "stability_conservative": {
+      "mean_reward": 17.769536441066546,
+      "std_reward": 9.764583019310976,
+      "mean_utilization": 0.16451999999999997,
+      "std_utilization": 0.07845871270929698,
+      "mean_placement": 2.68,
+      "max_placement": 4,
+      "success_rate": 0.0,
+      "combined_score": 16.847260932319962,
+      "episodes": 25,
+      "training_time": 1389.3447465896606,
+      "params": {
+        "learning_rate": 0.00012,
+        "n_steps": 1024,
+        "batch_size": 64,
+        "n_epochs": 6,
+        "clip_range": 0.15,
+        "ent_coef": 0.005,
+        "vf_coef": 0.5,
+        "gae_lambda": 0.98,
+        "net_arch": [
+          {
+            "pi": [
+              256,
+              128,
+              64
+            ],
+            "vf": [
+              256,
+              128,
+              64
+            ]
+          }
+        ]
+      }
+    },
+    "stability_balanced": {
+      "mean_reward": 20.510434305840025,
+      "std_reward": 13.465232699372478,
+      "mean_utilization": 0.18708,
+      "std_utilization": 0.08849267540310894,
+      "mean_placement": 3.0,
+      "max_placement": 5,
+      "success_rate": 0.04,
+      "combined_score": 19.248730291752004,
+      "episodes": 25,
+      "training_time": 1292.4802298545837,
+      "params": {
+        "learning_rate": 0.00013,
+        "n_steps": 768,
+        "batch_size": 96,
+        "n_epochs": 5,
+        "clip_range": 0.18,
+        "ent_coef": 0.008,
+        "vf_coef": 0.5,
+        "gae_lambda": 0.96,
+        "net_arch": [
+          {
+            "pi": [
+              256,
+              128,
+              64
+            ],
+            "vf": [
+              256,
+              128,
+              64
+            ]
+          }
+        ]
+      }
+    },
+    "arch_wide": {
+      "mean_reward": 15.681780486063563,
+      "std_reward": 8.603498918935664,
+      "mean_utilization": 0.1362,
+      "std_utilization": 0.0634015772674466,
+      "mean_placement": 2.44,
+      "max_placement": 4,
+      "success_rate": 0.0,
+      "combined_score": 14.238534145819067,
+      "episodes": 25,
+      "training_time": 1392.1087546348572,
+      "params": {
+        "learning_rate": 0.00015,
+        "n_steps": 512,
+        "batch_size": 128,
+        "n_epochs": 4,
+        "clip_range": 0.2,
+        "ent_coef": 0.01,
+        "vf_coef": 0.5,
+        "gae_lambda": 0.95,
+        "net_arch": [
+          {
+            "pi": [
+              512,
+              256,
+              128
+            ],
+            "vf": [
+              512,
+              256,
+              128
+            ]
+          }
+        ]
+      }
+    },
+    "arch_deep": {
+      "mean_reward": 18.93144607612531,
+      "std_reward": 15.597276261257644,
+      "mean_utilization": 0.12956,
+      "std_utilization": 0.07962968290782026,
+      "mean_placement": 2.4,
+      "max_placement": 5,
+      "success_rate": 0.04,
+      "combined_score": 14.748633822837593,
+      "episodes": 25,
+      "training_time": 1431.5862419605255,
+      "params": {
+        "learning_rate": 0.00014,
+        "n_steps": 512,
+        "batch_size": 128,
+        "n_epochs": 4,
+        "clip_range": 0.2,
+        "ent_coef": 0.01,
+        "vf_coef": 0.5,
+        "gae_lambda": 0.95,
+        "net_arch": [
+          {
+            "pi": [
+              256,
+              256,
+              128,
+              64
+            ],
+            "vf": [
+              256,
+              256,
+              128,
+              64
+            ]
+          }
+        ]
+      }
+    },
+    "arch_balanced": {
+      "mean_reward": 19.327370725406972,
+      "std_reward": 12.435971801105223,
+      "mean_utilization": 0.1728,
+      "std_utilization": 0.10760371740790371,
+      "mean_placement": 2.68,
+      "max_placement": 5,
+      "success_rate": 0.08,
+      "combined_score": 17.894211217622093,
+      "episodes": 25,
+      "training_time": 1354.294156551361,
+      "params": {
+        "learning_rate": 0.00015,
+        "n_steps": 512,
+        "batch_size": 128,
+        "n_epochs": 4,
+        "clip_range": 0.2,
+        "ent_coef": 0.01,
+        "vf_coef": 0.5,
+        "gae_lambda": 0.95,
+        "net_arch": [
+          {
+            "pi": [
+              384,
+              192,
+              96
+            ],
+            "vf": [
+              384,
+              192,
+              96
+            ]
+          }
+        ]
+      }
+    },
+    "arch_reinforced": {
+      "mean_reward": 22.69414070179819,
+      "std_reward": 19.689124306140325,
+      "mean_utilization": 0.18239999999999998,
+      "std_utilization": 0.09808200650476111,
+      "mean_placement": 2.76,
+      "max_placement": 5,
+      "success_rate": 0.16,
+      "combined_score": 19.576242210539455,
+      "episodes": 25,
+      "training_time": 1307.3254072666168,
+      "params": {
+        "learning_rate": 0.00015,
+        "n_steps": 512,
+        "batch_size": 128,
+        "n_epochs": 4,
+        "clip_range": 0.2,
+        "ent_coef": 0.01,
+        "vf_coef": 0.5,
+        "gae_lambda": 0.95,
+        "net_arch": [
+          {
+            "pi": [
+              256,
+              128,
+              128,
+              64
+            ],
+            "vf": [
+              256,
+              128,
+              128,
+              64
+            ]
+          }
+        ]
+      }
+    },
+    "opt_precision": {
+      "mean_reward": 16.95559159794512,
+      "std_reward": 10.582027167720586,
+      "mean_utilization": 0.1598,
+      "std_utilization": 0.07032382242170855,
+      "mean_placement": 2.76,
+      "max_placement": 5,
+      "success_rate": 0.04,
+      "combined_score": 16.272677479383535,
+      "episodes": 25,
+      "training_time": 1383.001041173935,
+      "params": {
+        "learning_rate": 0.00011,
+        "n_steps": 1536,
+        "batch_size": 192,
+        "n_epochs": 8,
+        "clip_range": 0.12,
+        "ent_coef": 0.003,
+        "vf_coef": 0.6,
+        "gae_lambda": 0.99,
+        "net_arch": [
+          {
+            "pi": [
+              256,
+              128,
+              64
+            ],
+            "vf": [
+              256,
+              128,
+              64
+            ]
+          }
+        ]
+      }
+    },
+    "opt_aggressive": {
+      "mean_reward": 18.799590677668565,
+      "std_reward": 8.956001225061822,
+      "mean_utilization": 0.15928,
+      "std_utilization": 0.08228026251781165,
+      "mean_placement": 2.52,
+      "max_placement": 5,
+      "success_rate": 0.04,
+      "combined_score": 16.78947720330057,
+      "episodes": 25,
+      "training_time": 1276.3791756629944,
+      "params": {
+        "learning_rate": 0.00018,
+        "n_steps": 256,
+        "batch_size": 64,
+        "n_epochs": 3,
+        "clip_range": 0.25,
+        "ent_coef": 0.02,
+        "vf_coef": 0.4,
+        "gae_lambda": 0.92,
+        "net_arch": [
+          {
+            "pi": [
+              256,
+              128,
+              64
+            ],
+            "vf": [
+              256,
+              128,
+              64
+            ]
+          }
+        ]
+      }
+    }
+  }
+}
