@@ -514,19 +514,38 @@ class EnhancedOptimizer:
                 remaining = self.target_score - best_score
                 print(f"📊 목표까지 {remaining:.3f}점 부족")
             
+            # NumPy 타입을 Python 기본 타입으로 변환하는 함수
+            def convert_numpy_types(obj):
+                """NumPy 타입을 JSON 직렬화 가능한 타입으로 변환"""
+                if isinstance(obj, np.integer):
+                    return int(obj)
+                elif isinstance(obj, np.floating):
+                    return float(obj)
+                elif isinstance(obj, np.ndarray):
+                    return obj.tolist()
+                elif isinstance(obj, dict):
+                    return {key: convert_numpy_types(value) for key, value in obj.items()}
+                elif isinstance(obj, list):
+                    return [convert_numpy_types(item) for item in obj]
+                else:
+                    return obj
+            
+            # 결과를 JSON 직렬화 가능한 형태로 변환
+            converted_results = convert_numpy_types(results)
+            
             # 결과 저장
             output_data = {
                 'timestamp': self.timestamp,
                 'phase': 'phase4_enhanced_optimization',
                 'focus': focus,
-                'timesteps': timesteps,
-                'target_score': self.target_score,
-                'phase3_baseline': self.phase3_best['score'],
-                'best_score': best_score,
+                'timesteps': int(timesteps),  # 명시적으로 int 변환
+                'target_score': float(self.target_score),  # 명시적으로 float 변환
+                'phase3_baseline': float(self.phase3_best['score']),
+                'best_score': float(best_score),
                 'best_config': best_config,
-                'target_achievement': target_achievement,
-                'total_time_minutes': total_time / 60,
-                'results': results
+                'target_achievement': float(target_achievement),
+                'total_time_minutes': float(total_time / 60),
+                'results': converted_results
             }
             
             output_file = os.path.join(self.results_dir, f'phase4_enhanced_{focus}_{self.timestamp}.json')
