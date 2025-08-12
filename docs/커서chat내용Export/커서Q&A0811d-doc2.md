@@ -30761,13 +30761,9 @@ item_sizes.extend([box1, box2])  # 부피 보존
 - 논문 개념 중 SUR/Online/Feasibility를 충실히 반영했으며, 모델 구조는 간소화되어 마스킹·보상·HPO로 보강.
 
 ---
-
 **User**
-
 @RL-3DbinPacking/ 위 답변의 '3. 핵심 모듈' 부분에 대해 상세한 설명을 추가해줘
-
 ---
-
 **Cursor**
 
 ### 3. 핵심 모듈 상세 설명(직접 연관 파일만)
