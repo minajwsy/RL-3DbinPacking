@@ -11,7 +11,7 @@
 ## Enhanced Optimization & Production Final Test 실행 관련 파일
 
 ### 🎯 **개요**
-이 문서는 `enhanced_optimization.py`와 `production_final_test.py` 실행에 직접 관련된 핵심 모듈들을 체계적으로 문서화합니다.
+이 문서는 `enhanced_optimization.py`와 `production_final_test.py` 실행에 직접 관련된 핵심 모듈들을 체계적으로 문서화한다.
 
 ---
 
@@ -490,7 +490,7 @@ results = evaluate_production_model(
 ### enhanced_optimization.py & production_final_test.py 실행 관련 파일
 
 ### 🎯 **개요**
-이 문서는 `enhanced_optimization.py`와 `production_final_test.py` 실행에 직접 관련된 핵심 모듈들을 체계적으로 문서화합니다. 이전 문서화 내용을 기반으로 최신 실행 내용을 반영하여 업데이트했습니다.
+이 문서는 `enhanced_optimization.py`와 `production_final_test.py` 실행에 직접 관련된 핵심 모듈들을 체계적으로 문서화한다. 이전 문서화 내용을 기반으로 최신 실행 내용을 반영하여 업데이트했습니다.
 
 ---
 
@@ -506,16 +506,16 @@ production_final_test.py      # 프로덕션 최종 검증 스크립트
 
 #### **2.1 학습 엔진**
 - **`train_maskable_ppo.py`**
-  - **역할**: Maskable PPO 학습의 핵심 엔진. `make_env` 함수를 통해 환경 생성 및 래퍼 적용을 담당합니다.
+  - **역할**: Maskable PPO 학습의 핵심 엔진. `make_env` 함수를 통해 환경 생성 및 래퍼 적용을 담당한다.
   - **주요 기능**:
-    - `make_env()`: `PackingEnv`를 생성하고 `ActionMasker`, `ImprovedRewardWrapper` 등의 래퍼를 적용합니다.
-    - `get_action_masks()`: 현재 상태에서 가능한 액션을 계산하여 마스크를 반환합니다.
-    - `ImprovedRewardWrapper`: 공간 활용률과 배치된 박스 수를 기반으로 보상을 동적으로 조절하여 학습을 효율화합니다.
+    - `make_env()`: `PackingEnv`를 생성하고 `ActionMasker`, `ImprovedRewardWrapper` 등의 래퍼를 적용한다.
+    - `get_action_masks()`: 현재 상태에서 가능한 액션을 계산하여 마스크를 반환한다.
+    - `ImprovedRewardWrapper`: 공간 활용률과 배치된 박스 수를 기반으로 보상을 동적으로 조절하여 학습을 효율화한다.
   - **의존성**: `packing_env`, `utils`, `device_utils`
 
 #### **2.2 환경 정의**
 - **`packing_env.py`**
-  - **역할**: 3D Bin Packing 문제를 위한 Gymnasium 호환 환경을 정의합니다.
+  - **역할**: 3D Bin Packing 문제를 위한 Gymnasium 호환 환경을 정의한다.
   - **주요 클래스**: `PackingEnv`
   - **관찰 공간 (Observation Space)**: 
     - `height_map`: 컨테이너의 2D 높이 맵 (Top-down view)
@@ -525,30 +525,30 @@ production_final_test.py      # 프로덕션 최종 검증 스크립트
 
 #### **2.3 패킹 엔진**
 - **`packing_kernel.py`**
-  - **역할**: 3D 패킹 문제의 핵심 물리 로직을 처리합니다.
+  - **역할**: 3D 패킹 문제의 핵심 물리 로직을 처리한다.
   - **주요 클래스**:
     - `Box`: 3D 박스를 나타내는 객체. 위치, 크기, ID 등의 속성을 가집니다.
-    - `Container`: 3D 컨테이너를 나타내는 객체. 박스 배치, 충돌 검사, 높이 맵 업데이트 등의 기능을 수행합니다.
+    - `Container`: 3D 컨테이너를 나타내는 객체. 박스 배치, 충돌 검사, 높이 맵 업데이트 등의 기능을 수행한다.
   - **핵심 메서드**:
-    - `Container.place_box()`: 지정된 위치에 박스를 배치하고 높이 맵을 업데이트합니다.
-    - `Container.check_valid_box_placement()`: 특정 위치에 박스를 놓을 수 있는지 확인합니다.
-    - `Container.action_mask()`: 주어진 박스에 대해 가능한 모든 액션 마스크를 계산합니다.
+    - `Container.place_box()`: 지정된 위치에 박스를 배치하고 높이 맵을 업데이트한다.
+    - `Container.check_valid_box_placement()`: 특정 위치에 박스를 놓을 수 있는지 확인한다.
+    - `Container.action_mask()`: 주어진 박스에 대해 가능한 모든 액션 마스크를 계산한다.
   - **의존성**: `utils`
 
 #### **2.4 유틸리티**
 - **`utils.py`**
-  - **역할**: 박스 생성을 포함한 다양한 기하학적 유틸리티 함수를 제공합니다.
+  - **역할**: 박스 생성을 포함한 다양한 기하학적 유틸리티 함수를 제공한다.
   - **핵심 함수**:
-    - `boxes_generator()`: 주어진 컨테이너 크기에 맞는 랜덤한 박스 크기 리스트를 생성합니다.
-    - `generate_vertices()`: 3D 박스의 8개 꼭짓점 좌표를 계산하여 시각화에 사용합니다.
-    - `cuboids_intersection()`: 두 박스가 공간적으로 겹치는지 검사합니다.
+    - `boxes_generator()`: 주어진 컨테이너 크기에 맞는 랜덤한 박스 크기 리스트를 생성한다.
+    - `generate_vertices()`: 3D 박스의 8개 꼭짓점 좌표를 계산하여 시각화에 사용한다.
+    - `cuboids_intersection()`: 두 박스가 공간적으로 겹치는지 검사한다.
 
 - **`device_utils.py`**
-  - **역할**: 학습에 사용할 장치(GPU/CPU)를 자동으로 선택하고 관련 정보를 로깅합니다.
+  - **역할**: 학습에 사용할 장치(GPU/CPU)를 자동으로 선택하고 관련 정보를 로깅한다.
   - **핵심 함수**:
-    - `get_device()`: 사용 가능한 최적의 `torch.device`를 반환합니다.
-    - `setup_training_device()`: 장치에 따라 최적화된 기본 하이퍼파라미터 세트를 제공합니다.
-    - `log_system_info()`: 시스템 환경(OS, Python, PyTorch, CUDA 버전)을 출력합니다.
+    - `get_device()`: 사용 가능한 최적의 `torch.device`를 반환한다.
+    - `setup_training_device()`: 장치에 따라 최적화된 기본 하이퍼파라미터 세트를 제공한다.
+    - `log_system_info()`: 시스템 환경(OS, Python, PyTorch, CUDA 버전)을 출력한다.
 
 ---
 
@@ -1115,7 +1115,7 @@ python production_final_test.py --quick     # 25k step / 30 ep
 
 ## 1. 개요: 논문 vs. 코드베이스
 
-본 코드베이스는 논문에서 제안한 Transformer 기반 정책 대신, 계산 효율성이 높은 **MLP (Multi-Layer Perceptron) 정책**과 **MaskablePPO**를 결합하여 3D Bin Packing 문제를 해결합니다. 논문의 핵심 아이디어인 **'Height Map' 상태 표현**과 **'Action Masking'**을 동일하게 채택하여, 경량화된 모델로도 유사한 수준의 성능에 도달하는 것을 목표로 합니다.
+본 코드베이스는 논문에서 제안한 Transformer 기반 정책 대신, 계산 효율성이 높은 **MLP (Multi-Layer Perceptron) 정책**과 **MaskablePPO**를 결합하여 3D Bin Packing 문제를 해결한다. 논문의 핵심 아이디어인 **'Height Map' 상태 표현**과 **'Action Masking'**을 동일하게 채택하여, 경량화된 모델로도 유사한 수준의 성능에 도달하는 것을 목표로 한다.
 
 | 구분 | Heng et al. (논문) | 본 코드베이스 |
 | :--- | :--- | :--- |
@@ -1130,8 +1130,8 @@ python production_final_test.py --quick     # 25k step / 30 ep
 
 | 파일 경로 | 목적 | 논문 관점의 역할 |
 | :--- | :--- | :--- |
-| **`enhanced_optimization.py`** | **Phase-4 정밀 하이퍼파라미터 탐색**: 8가지 전략(stability, architecture, optimization)을 병렬로 학습하고 비교 분석합니다. | 논문의 **"Ablation Studies"** (Table 5)와 유사. 다양한 하이퍼파라미터 조합의 성능을 체계적으로 비교하여 최적 설정을 도출합니다. |
-| **`production_final_test.py`** | **Phase-4 최종 검증**: `enhanced_optimization.py`에서 도출된 최적 설정(`PRODUCTION_OPTIMAL`)을 고정하여, 대규모(50 에피소드) 반복 테스트로 성능의 안정성과 재현성을 검증합니다. | 논문의 **"Performance Comparison"** (Table 4)과 유사. 최종 제안 모델의 성능을 보고하기 위한 검증 단계입니다. |
+| **`enhanced_optimization.py`** | **Phase-4 정밀 하이퍼파라미터 탐색**: 8가지 전략(stability, architecture, optimization)을 병렬로 학습하고 비교 분석한다. | 논문의 **"Ablation Studies"** (Table 5)와 유사. 다양한 하이퍼파라미터 조합의 성능을 체계적으로 비교하여 최적 설정을 도출한다. |
+| **`production_final_test.py`** | **Phase-4 최종 검증**: `enhanced_optimization.py`에서 도출된 최적 설정(`PRODUCTION_OPTIMAL`)을 고정하여, 대규모(50 에피소드) 반복 테스트로 성능의 안정성과 재현성을 검증한다. | 논문의 **"Performance Comparison"** (Table 4)과 유사. 최종 제안 모델의 성능을 보고하기 위한 검증 단계이다. |
 
 ---
 
@@ -1139,10 +1139,10 @@ python production_final_test.py --quick     # 25k step / 30 ep
 
 | 모듈 경로 | 핵심 클래스/함수 | 논문 용어 매핑 |
 | :--- | :--- | :--- |
-| **`train_maskable_ppo.py`** | **`make_env()`**: 환경 생성 및 래퍼 적용<br>**`get_action_masks()`**: 유효 액션 필터링<br>**`ImprovedRewardWrapper`**: 보상 함수 재설계 | **Action Feasibility Module**: `get_action_masks()`가 물리적으로 불가능한 액션을 제거하여 정책의 탐색 공간을 줄입니다.<br>**Reward Shaping**: `ImprovedRewardWrapper`는 최종 보상 외에 중간 단계 보상을 추가하여 학습을 가속화합니다. |
-| **`packing_env.py`** | **`PackingEnv`**: Gymnasium 호환 환경 | **Environment State (Eq. 1)**: `observation = {'height_map', 'visible_box_sizes'}`. 논문에서 정의한 상태와 정확히 일치합니다. |
-| **`packing_kernel.py`** | **`Box`**, **`Container`**: 물리 객체<br>**`place_box()`**, **`check_valid_box_placement()`**: 핵심 물리 로직 | **Physics Simulator**: 컨테이너 내 박스의 위치, 충돌, 높이 맵 변화 등 물리적 상호작용을 시뮬레이션합니다. |
-| **`utils.py`** | **`boxes_generator()`**: 박스 크기 샘플링 | **Online Box Stream**: 실시간으로 도착하는 아이템 스트림을 모사하여 학습 및 평가에 사용될 박스 리스트를 생성합니다. |
+| **`train_maskable_ppo.py`** | **`make_env()`**: 환경 생성 및 래퍼 적용<br>**`get_action_masks()`**: 유효 액션 필터링<br>**`ImprovedRewardWrapper`**: 보상 함수 재설계 | **Action Feasibility Module**: `get_action_masks()`가 물리적으로 불가능한 액션을 제거하여 정책의 탐색 공간을 줄이다.<br>**Reward Shaping**: `ImprovedRewardWrapper`는 최종 보상 외에 중간 단계 보상을 추가하여 학습을 가속화한다. |
+| **`packing_env.py`** | **`PackingEnv`**: Gymnasium 호환 환경 | **Environment State (Eq. 1)**: `observation = {'height_map', 'visible_box_sizes'}`. 논문에서 정의한 상태와 정확히 일치한다. |
+| **`packing_kernel.py`** | **`Box`**, **`Container`**: 물리 객체<br>**`place_box()`**, **`check_valid_box_placement()`**: 핵심 물리 로직 | **Physics Simulator**: 컨테이너 내 박스의 위치, 충돌, 높이 맵 변화 등 물리적 상호작용을 시뮬레이션한다. |
+| **`utils.py`** | **`boxes_generator()`**: 박스 크기 샘플링 | **Online Box Stream**: 실시간으로 도착하는 아이템 스트림을 모사하여 학습 및 평가에 사용될 박스 리스트를 생성한다. |
 | **`device_utils.py`** | **`get_device()`**: GPU/CPU 자동 선택 | N/A (실험 인프라 관리) |
 
 ---
@@ -1287,7 +1287,7 @@ position = [res // X, res % X]
 
 ```mermaid
 graph TD
-    subgraph "Phase 1: Hyperparameter Optimization"
+    subgraph "1.Hyperparameter 최적화"
         A[enhanced_optimization.py] -- "8가지 설정" --> B{Loop}
         B -- "각 설정" --> C[make_env]
         C --> D[MaskablePPO 학습]
@@ -1295,7 +1295,7 @@ graph TD
         E --> F[results/phase4_*.json]
     end
 
-    subgraph "Phase 2: Final Verification"
+    subgraph "2.Final Verification"
         G[production_final_test.py] -- "최적 설정 로드" --> H[make_env]
         H --> I[MaskablePPO 재학습]
         I --> J[50 에피소드 평가]
@@ -1308,7 +1308,7 @@ graph TD
     I -- "Action Mask" --> M
 ```
 1.  **`enhanced_optimization.py`**: 8개의 다른 하이퍼파라미터로 모델을 학습/평가하여 최상의 조합(`PRODUCTION_OPTIMAL`)을 찾습니다.
-2.  **`production_final_test.py`**: 위에서 찾은 최적 조합으로만 모델을 다시 학습하고, 더 많은 에피소드로 평가하여 성능을 최종 검증합니다.
+2.  **`production_final_test.py`**: 위에서 찾은 최적 조합으로만 모델을 다시 학습하고, 더 많은 에피소드로 평가하여 성능을 최종 검증한다.
 
 ---
 실행 파이프라인과 데이터 흐름을 상기 다이어그램과 함께 상세하게 설명한다. 아래 다이어그램은 현재 코드베이스의 기본 흐름과 200박스 실험으로 확장했을 때도 동일하게 적용된다.
@@ -1454,62 +1454,62 @@ python production_final_test.py --num-boxes 64 --timesteps 25000 --n-steps 2048 
 python production_final_test.py --num-boxes 200 --timesteps 150000 --n-steps 4096 --net-arch 512,512,256
 ```
 
-- 내부적으로는 위 다이어그램의 파이프라인을 그대로 실행합니다. 결과는 `models/`, `logs/`, `results/`에 저장됩니다.
+- 내부적으로는 위 다이어그램의 파이프라인을 그대로 실행한다. 결과는 `models/`, `logs/`, `results/`에 저장된다.
 
-- **combined_score**는 코드 전반에서 동일 정의를 사용합니다:
+- **combined_score**는 코드 전반에서 동일 정의를 사용한다:
   - `combined_score = 0.3 * mean_reward + 0.7 * (mean_utilization * 100)`
 
-- GIF/시각화 시 `Monitor` 래퍼로 인한 속성 접근 오류는 이미 `env.unwrapped` 경로로 해결되어 있습니다.
+- GIF/시각화 시 `Monitor` 래퍼로 인한 속성 접근 오류는 이미 `env.unwrapped` 경로로 해결되어 있다.
 
 - 999-step hang 이슈는 `ultimate_train_fix.py`로 해결된 흐름을 그대로 따릅니다.
 
-- HPO를 돌릴 경우 같은 파이프라인이 trial마다 반복되며, 최적 파라미터가 `results/`에 누적 기록됩니다.
+- HPO를 돌릴 경우 같은 파이프라인이 trial마다 반복되며, 최적 파라미터가 `results/`에 누적 기록된다.
 
-- 평가 단계에서는 `deterministic=True` 설정으로 정책의 안정적 성능을 측정하고, 마스크는 항상 적용합니다.
+- 평가 단계에서는 `deterministic=True` 설정으로 정책의 안정적 성능을 측정하고, 마스크는 항상 적용한다.
 
-- 실험 조건 비교(예: 논문 대비 200박스)는 `num_boxes`와 `timesteps`만으로 충분하며, 나머지 흐름은 동일합니다.
+- 실험 조건 비교(예: 논문 대비 200박스)는 `num_boxes`와 `timesteps`만으로 충분하며, 나머지 흐름은 동일하다.
 
-- 필요 시 `enhanced_optimization.py`의 전략(예: `stability_balanced`)에서 `num_boxes`만 증가시켜 동일 파이프라인으로 배치할 수 있습니다.
+- 필요 시 `enhanced_optimization.py`의 전략(예: `stability_balanced`)에서 `num_boxes`만 증가시켜 동일 파이프라인으로 배치할 수 있다.
 
 - 코드 내 함수 대응: `create_env`/`make_env` 유틸로 환경 구성 → `ImprovedRewardWrapper`, `ActionMasker` → `MaskablePPO` 생성 → `model.learn` → 평가/지표 산출 → 결과 저장.
 
-- 장애 포인트가 재발하면 `gradual_expansion_debug.py`의 상세 로깅 버전으로 같은 파이프라인을 좁은 스케일에서 재현·디버깅합니다.
+- 장애 포인트가 재발하면 `gradual_expansion_debug.py`의 상세 로깅 버전으로 같은 파이프라인을 좁은 스케일에서 재현·디버깅한다.
 
-- 클라우드/CPU-only 모드에서는 `cpu_only_optimal_test.py`의 디바이스 강제 설정으로 동일 파이프라인을 CPU 상에서 재생합니다.
+- 클라우드/CPU-only 모드에서는 `cpu_only_optimal_test.py`의 디바이스 강제 설정으로 동일 파이프라인을 CPU 상에서 재생한다.
 
-- 전체 플로우는 모듈화되어 있어, 학습/평가/최적화 어느 루트로 시작하든 동일한 관찰→마스킹→정책→스텝→보상→로깅 데이터 흐름을 공유합니다.
+- 전체 플로우는 모듈화되어 있어, 학습/평가/최적화 어느 루트로 시작하든 동일한 관찰→마스킹→정책→스텝→보상→로깅 데이터 흐름을 공유한다.
 
 - Optuna/W&B를 붙일 경우에도 다이어그램의 “설정→데이터→환경→학습→평가→지표” 체인이 trial 단위로 반복될 뿐, 추가적인 데이터 경로 변화는 없습니다.
 
-- 결과 해석은 `RESULTS_INTERPRETATION_GUIDE.md`의 지표 정의에 기반합니다.
+- 결과 해석은 `RESULTS_INTERPRETATION_GUIDE.md`의 지표 정의에 기반한다.
 
-- 논문식 200박스 비교 시에도 SUR 유사 지표(활용률)와 `combined_score`를 병행 보고하면 파이프라인 일관성을 유지합니다.
+- 논문식 200박스 비교 시에도 SUR 유사 지표(활용률)와 `combined_score`를 병행 보고하면 파이프라인 일관성을 유지한다.
 
 - GIF 생성 파이프라인은 학습/평가 루프 바깥에서 `env.unwrapped.container`/`packed_boxes`를 읽어 프레임을 뽑는 별도 흐름이며, 학습 데이터 경로에는 간섭하지 않습니다.
 
-- 끝으로, `ultimate_train_fix.py` 경로를 기준으로 실행하면 콜백/평가 타이밍이 안정화되어 999-step hang 없이 위 파이프라인을 그대로 실행합니다.
+- 끝으로, `ultimate_train_fix.py` 경로를 기준으로 실행하면 콜백/평가 타이밍이 안정화되어 999-step hang 없이 위 파이프라인을 그대로 실행한다.
 
-- 대규모(200박스)에서 병목이 보이면 `get_action_masks`와 보상 계산을 먼저 점검해 주세요. 동일 파이프라인에서 가장 호출 빈도가 높은 부분입니다.
+- 대규모(200박스)에서 병목이 보이면 `get_action_masks`와 보상 계산을 먼저 점검해 주세요. 동일 파이프라인에서 가장 호출 빈도가 높은 부분이다.
 
-- 필요 시 실행 로그(`logs/*.csv`)와 모델 스냅샷(`models/*.zip`)을 통해 같은 파이프라인 상태를 재현할 수 있습니다.
+- 필요 시 실행 로그(`logs/*.csv`)와 모델 스냅샷(`models/*.zip`)을 통해 같은 파이프라인 상태를 재현할 수 있다.
 
-- 위 다이어그램을 기준으로, 특정 단계에 대한 추가 세부 흐름(예: 보상 항목별 기여, 마스크 구성 규칙)을 더 풀어드릴 수 있습니다. 원하는 지점을 알려주세요.
+- 위 다이어그램을 기준으로, 특정 단계에 대한 추가 세부 흐름(예: 보상 항목별 기여, 마스크 구성 규칙)을 더 풀어드릴 수 있다. 원하는 지점을 알려주세요.
 
-- 핵심: 파이프라인은 단순·일관하며, 박스 개수 확장/하이퍼파라미터/HPO 여부와 관계없이 동일한 데이터 흐름을 유지합니다.
+- 핵심: 파이프라인은 단순·일관하며, 박스 개수 확장/하이퍼파라미터/HPO 여부와 관계없이 동일한 데이터 흐름을 유지한다.
 
-- 안정성 측면에서는 `Monitor`/`unwrapped` 접근, 함수 순서 정리, `activation_fn=nn.ReLU` 등 기존 수정 사항이 이미 반영되어 있습니다.
+- 안정성 측면에서는 `Monitor`/`unwrapped` 접근, 함수 순서 정리, `activation_fn=nn.ReLU` 등 기존 수정 사항이 이미 반영되어 있다.
 
-- 따라서 현재 실험과 논문형 비교 실험 모두 위 파이프라인으로 안전하게 실행 가능합니다.
+- 따라서 현재 실험과 논문형 비교 실험 모두 위 파이프라인으로 안전하게 실행 가능한다.
 
-- 마지막으로, 200박스 실험 시 `results/`에 저장되는 JSON과 요약 텍스트에서 `combined_score`의 추이를 관찰하면, 동일 파이프라인을 기반으로 한 설정간 공정 비교가 가능합니다.
+- 마지막으로, 200박스 실험 시 `results/`에 저장되는 JSON과 요약 텍스트에서 `combined_score`의 추이를 관찰하면, 동일 파이프라인을 기반으로 한 설정간 공정 비교가 가능한다.
 
 - 필요하면 도식 이미지를 별도로 내보내 드리겠습니다.
 
 - 문의 주신 ‘4. 실행 파이프라인 및 데이터 흐름’에 맞춰, 다이어그램과 단계별 대응을 위와 같이 정리했습니다.
 
-- 다음 단계로, 현재 사용 중인 스크립트(`production_final_test.py` 또는 `enhanced_optimization.py`)에서 `num_boxes`만 늘려 위 파이프라인을 그대로 실행하시길 권합니다.
+- 다음 단계로, 현재 사용 중인 스크립트(`production_final_test.py` 또는 `enhanced_optimization.py`)에서 `num_boxes`만 늘려 위 파이프라인을 그대로 실행하시길 권한다.
 
-- 추가로 HPO를 붙일지 여부는 리소스/시간 고려 후 결정하면 됩니다.
+- 추가로 HPO를 붙일지 여부는 리소스/시간 고려 후 결정하면 된다.
 
 - 최적화나 디버깅용 상세 로그가 필요하면 `gradual_expansion_debug.py`의 로깅 수준을 참조해 동일 파이프라인에 삽입하세요.
 
@@ -1603,7 +1603,7 @@ python production_final_test.py --num-boxes 200 --timesteps 150000 --n-steps 409
 
 지금 핵심 정의(관찰/행동/마스크/보상)를 코드에서 정확히 확인하기 위해 관련 파일들을 한꺼번에 열람하겠습니다.
 
-간단한 진행 상황: 핵심 구조를 정확히 설명하기 위해 `src/packing_env.py`, `src/packing_kernel.py`, `src/train_maskable_ppo.py`, `src/ultimate_train_fix.py`, `src/utils.py`를 확인했습니다. 아래에 코드 라인 인용과 함께 데이터 구조와 수식을 정리합니다.
+간단한 진행 상황: 핵심 구조를 정확히 설명하기 위해 `src/packing_env.py`, `src/packing_kernel.py`, `src/train_maskable_ppo.py`, `src/ultimate_train_fix.py`, `src/utils.py`를 확인했습니다. 아래에 코드 라인 인용과 함께 데이터 구조와 수식을 정리한다.
 
 ### 관찰(Observation) 구조
 
@@ -1630,8 +1630,8 @@ observation_dict = {
 ```
 
 - 범위/타입
-  - MultiDiscrete 상한은 “비포함”이므로, 내부 배열에 +1을 더해 상한을 설정합니다.
-  - height_map는 `np.int64`로 평탄화; visible_box_sizes는 각 축 별 상한이 컨테이너 크기(+1)입니다.
+  - MultiDiscrete 상한은 “비포함”이므로, 내부 배열에 +1을 더해 상한을 설정한다.
+  - height_map는 `np.int64`로 평탄화; visible_box_sizes는 각 축 별 상한이 컨테이너 크기(+1)이다.
 ```138:145:src/packing_env.py
 height_map_repr = np.ones(
     shape=(container_size[0], container_size[1]), dtype=np.int64
@@ -1661,7 +1661,7 @@ self.state["visible_box_sizes"] = np.reshape(box_size_list, (self.num_visible_bo
   - \(b = \left\lfloor \frac{a}{X\cdot Y} \right\rfloor\): 가시 박스 인덱스
   - \(r = a \bmod (X\cdot Y)\)
   - 코드 구현 기준 좌표: \(x = \left\lfloor \frac{r}{X} \right\rfloor,\; y = r \bmod X\)
-    - 주석 설명과 `X/Y` 축 사용이 다소 상이합니다. 아래는 “현재 코드” 기준입니다.
+    - 주석 설명과 `X/Y` 축 사용이 다소 상이한다. 아래는 “현재 코드” 기준이다.
 ```185:206:src/packing_env.py
 box_index = action // (self.container.size[0] * self.container.size[1])
 res = action % (self.container.size[0] * self.container.size[1])
@@ -2070,7 +2070,7 @@ RL-3DbinPacking/
 
 ### 1. 개요 및 핵심 접근 방식의 차이
 
-가장 큰 차이점은 **정책 모델(Policy Model)**에 있습니다.
+가장 큰 차이점은 **정책 모델(Policy Model)**에 있다.
 
 | 구분 | Heng et al. (논문) | 본 코드베이스 |
 | :--- | :--- | :--- |
@@ -2084,12 +2084,12 @@ RL-3DbinPacking/
 
 ### 2. 정량적 성능 비교 분석
 
-성능을 직접 비교하기는 어렵습니다. 논문은 표준 벤치마크 데이터셋(e.g., BR1-15)에서의 성능을 보고하는 반면, 코드베이스는 `container=[10,10,10], boxes=12`라는 특정 문제 설정에 대한 성능을 측정하기 때문입니다. 그럼에도 불구하고, 각자의 목표에 대한 **달성 수준**을 비교할 수 있습니다.
+성능을 직접 비교하기는 어렵습니다. 논문은 표준 벤치마크 데이터셋(e.g., BR1-15)에서의 성능을 보고하는 반면, 코드베이스는 `container=[10,10,10], boxes=12`라는 특정 문제 설정에 대한 성능을 측정하기 때문이다. 그럼에도 불구하고, 각자의 목표에 대한 **달성 수준**을 비교할 수 있다.
 
 | 항목 | Heng et al. (Transformer) | 본 코드베이스 (MLP + MaskablePPO) | 분석 |
 | :--- | :--- | :--- | :--- |
-| **주요 평가지표** | 공간 활용률 (SUR: Space Utilization Ratio) | **Combined Score**<br>(0.3\*Reward + 0.7\*Utilization) | 코드베이스는 보상과 활용률을 모두 고려하는 복합 지표를 사용해 더 안정적인 정책을 목표로 합니다. |
-| **공간 활용률** | **약 35% ~ 45%** (표준 벤치마크 추정) | **20.3%**<br>(`production_final_test` 기준) | **[해석 주의]** 벤치마크가 달라 직접 비교는 무의미합니다. 코드베이스의 20.3%는 실시간으로 박스가 주어지는 더 어려운 "Online" 문제 설정에 대한 결과이며, 이는 매우 준수한 성능입니다. |
+| **주요 평가지표** | 공간 활용률 (SUR: Space Utilization Ratio) | **Combined Score**<br>(0.3\*Reward + 0.7\*Utilization) | 코드베이스는 보상과 활용률을 모두 고려하는 복합 지표를 사용해 더 안정적인 정책을 목표로 한다. |
+| **공간 활용률** | **약 35% ~ 45%** (표준 벤치마크 추정) | **20.3%**<br>(`production_final_test` 기준) | **[해석 주의]** 벤치마크가 달라 직접 비교는 무의미하다. 코드베이스의 20.3%는 실시간으로 박스가 주어지는 더 어려운 "Online" 문제 설정에 대한 결과이며, 이는 매우 준수한 성능이다. |
 | **학습 효율성** | 상대적으로 느리고 많은 자원 필요 | **매우 빠름** (최적 설정 학습에 **약 30분** 소요) | **코드베이스의 압도적 우위.** MLP 모델의 가벼움 덕분에 빠른 반복 실험과 HPO가 가능했습니다. |
 | **최적화 전략** | RL + Heuristics (Beam Search) | 순수 RL + **자동화된 HPO 파이프라인**<br>(`enhanced_optimization.py`) | 코드베이스는 HPO 과정을 스크립트로 자동화하여, 논문 연구 못지않은 체계적인 최적화를 수행했습니다. |
 | **최종 목표 달성** | 벤치마크 데이터셋에서 SOTA 달성 | **목표 점수(18.57) 대비 110.9% 달성**<br>(최종 20.591점) | 코드베이스는 설정된 목표를 초과 달성하며, 해당 문제에 대한 최적화를 성공적으로 완료했음을 입증했습니다. |
@@ -2104,7 +2104,7 @@ RL-3DbinPacking/
     단순히 최종 활용률만 보상으로 주는 대신, 각 스텝마다의 **공간 효율성, 안정성, 배치 성공 여부** 등을 종합적으로 고려한 **Reward Shaping**을 통해 MLP 모델이 더 쉽게 최적 정책을 찾도록 유도했습니다.
 
 2.  **체계적인 HPO 자동화 (`enhanced_optimization.py`)**:
-    이 스크립트는 본 프로젝트의 핵심 자산입니다. 8가지가 넘는 하이퍼파라미터 조합을 자동으로 테스트하고, 결과를 시각화하여 최적의 설정(`PRODUCTION_OPTIMAL`)을 과학적으로 도출했습니다. 이는 주먹구구식 튜닝을 배제하고 재현 가능한 성능 향상을 이끌었습니다.
+    이 스크립트는 본 프로젝트의 핵심 자산이다. 8가지가 넘는 하이퍼파라미터 조합을 자동으로 테스트하고, 결과를 시각화하여 최적의 설정(`PRODUCTION_OPTIMAL`)을 과학적으로 도출했습니다. 이는 주먹구구식 튜닝을 배제하고 재현 가능한 성능 향상을 이끌었습니다.
 
 3.  **Action Masking의 효과적인 활용**:
     논문의 핵심 아이디어인 Action Masking을 `MaskablePPO` 라이브러리를 통해 효과적으로 구현했습니다. 이를 통해 MLP 정책이 탐색해야 할 행동 공간을 대폭 줄여, 학습 효율을 극대화했습니다.
@@ -2118,9 +2118,9 @@ RL-3DbinPacking/
 | **평가** | **이론적 상한선 제시** | **실용적 최적화의 성공 사례** |
 | **의의** | Transformer가 3D Bin Packing 문제에 효과적임을 입증한 선구적인 연구. | 논문의 핵심 아이디어를 경량 모델로 구현하고, 정교한 엔지니어링과 자동화된 HPO를 통해 **특정 문제 상황에서 목표를 초과 달성**할 수 있음을 입증. |
 
-결론적으로, 본 코드베이스는 **"논문에서 제안된 비싼 Transformer 모델 없이도, 핵심 아이디어와 뛰어난 엔지니어링을 결합하면 목표 성능을 효율적으로 달성할 수 있다"**는 것을 성공적으로 보여준 사례입니다. 이는 학술적 연구를 실제 산업 문제에 적용할 때 매우 중요한 실용적인 접근법을 제시합니다.
+결론적으로, 본 코드베이스는 **"논문에서 제안된 비싼 Transformer 모델 없이도, 핵심 아이디어와 뛰어난 엔지니어링을 결합하면 목표 성능을 효율적으로 달성할 수 있다"**는 것을 성공적으로 보여준 사례이다. 이는 학술적 연구를 실제 산업 문제에 적용할 때 매우 중요한 실용적인 접근법을 제시한다.
 
-**향후 과제**로는 현재의 MLP 정책에 논문의 Self-Attention 메커니즘 일부를 결합한 **하이브리드 모델**을 탐색하여, 계산 효율성과 성능 표현력 사이의 새로운 최적점을 찾아보는 것을 제안할 수 있습니다.
+**향후 과제**로는 현재의 MLP 정책에 논문의 Self-Attention 메커니즘 일부를 결합한 **하이브리드 모델**을 탐색하여, 계산 효율성과 성능 표현력 사이의 새로운 최적점을 찾아보는 것을 제안할 수 있다.
 
 ---
 
@@ -2132,7 +2132,7 @@ RL-3DbinPacking/
 
 **Cursor**
 
-아래 비교는 첨부하신 논문 “Online 3D Bin Packing via Transformer-Based DRL” (Heng et al.)과 현재 코드베이스(MLP + MaskablePPO)의 **모델 구조·훈련 전략·평가지표·정량 결과·학습 효율성**을 항목별로 상세 분석한 것입니다.  
+아래 비교는 첨부하신 논문 “Online 3D Bin Packing via Transformer-Based DRL” (Heng et al.)과 현재 코드베이스(MLP + MaskablePPO)의 **모델 구조·훈련 전략·평가지표·정량 결과·학습 효율성**을 항목별로 상세 분석한 것이다.  
 
 > 주의 ① – 두 시스템은 **평가 환경과 지표**가 완전히 동일하지 않습니다.  
 > 주의 ② – 논문의 구체적 숫자는 본문·부록 표를 기준으로 요약-인용했습니다. (표기 ≈ : 대략값)  
@@ -2217,7 +2217,7 @@ RL-3DbinPacking/
 - **대규모·복잡 환경** → 논문의 Transformer 계열이 여전히 우위.  
 - **자원 제약·빠른 반복** → 본 코드베이스의 경량 MaskablePPO 전략이 뛰어난 실용 솔루션.  
 
-향후 연구 방향은 **Transformer Light + MaskablePPO** 하이브리드 모델을 탐색하여, 두 접근의 장점을 결합하는 것입니다.
+향후 연구 방향은 **Transformer Light + MaskablePPO** 하이브리드 모델을 탐색하여, 두 접근의 장점을 결합하는 것이다.
 
 ---
 
@@ -2285,8 +2285,8 @@ RL-3DbinPacking/
 | :--- | :--- | :--- |
 | **박스 수** | **200~300개**의 박스 스트림 | **200가지가 넘는 다양한 식재료**가 순서대로 주어짐 |
 | **박스 크기** | 대부분 작고 비슷한 크기 | 작은 채소, 양념 등 다루기 쉬운 재료들 |
-| **난이도** | **장기적인 조합 최적화**: 수많은 작은 박스들을 어떤 순서와 위치로 쌓아야 최종적으로 가장 높은 공간 활용률을 달성할지 예측해야 합니다. 중간에 작은 실수가 누적되면 나중에 큰 공간 낭비로 이어질 수 있습니다. | **코스 전체의 조화**: 지금 당장 맛있는 요리를 만드는 것도 중요하지만, 200가지 재료를 모두 사용해 완벽한 코스 요리를 완성해야 합니다. 재료 사용 순서와 조합을 계속해서 고민해야 합니다. |
-| **핵심 과제** | **장기 기억력과 관계 추론**: Transformer 모델은 어떤 박스 조합이 공간을 효율적으로 채우는지, 박스 간의 복잡한 관계를 학습하는 데 강점이 있습니다. | **레시피의 깊이**: 수많은 재료의 특성과 상호작용을 모두 기억하고, 전체적인 맛의 흐름을 설계하는 능력. |
+| **난이도** | **장기적인 조합 최적화**: 수많은 작은 박스들을 어떤 순서와 위치로 쌓아야 최종적으로 가장 높은 공간 활용률을 달성할지 예측해야 한다. 중간에 작은 실수가 누적되면 나중에 큰 공간 낭비로 이어질 수 있다. | **코스 전체의 조화**: 지금 당장 맛있는 요리를 만드는 것도 중요하지만, 200가지 재료를 모두 사용해 완벽한 코스 요리를 완성해야 한다. 재료 사용 순서와 조합을 계속해서 고민해야 한다. |
+| **핵심 과제** | **장기 기억력과 관계 추론**: Transformer 모델은 어떤 박스 조합이 공간을 효율적으로 채우는지, 박스 간의 복잡한 관계를 학습하는 데 강점이 있다. | **레시피의 깊이**: 수많은 재료의 특성과 상호작용을 모두 기억하고, 전체적인 맛의 흐름을 설계하는 능력. |
 
 ---
 
@@ -2297,17 +2297,17 @@ RL-3DbinPacking/
 | :--- | :--- | :--- |
 | **박스 수** | **12개**의 고정된 박스 세트 | **최고급 안심, 아스파라거스, 감자 등 12가지 핵심 재료** |
 | **박스 크기** | 크기가 다양하고, 큰 박스가 다수 포함 | 재료 하나하나가 크고 중요함 (예: 두꺼운 안심 스테이크) |
-| **난이도** | **결정적인 한 번의 실수 방지**: 박스 수가 적고 크기가 크기 때문에, 초반에 큰 박스 하나를 잘못 배치하면 남은 공간이 애매해져 다른 박스들이 전혀 들어가지 못하는 상황이 발생합니다. 매 순간의 선택이 매우 치명적입니다. | **굽기 정도와 타이밍**: 재료는 적지만, 스테이크를 단 한 번에 완벽한 미디엄 레어로 구워야 합니다. 너무 익히거나 덜 익히면 요리 전체를 망칩니다. 매 순간의 불 조절이 결정적입니다. |
-| **핵심 과제** | **효율적인 탐색과 즉각적인 판단**: MLP 모델은 가볍고 빠르기 때문에, Action Masking으로 불필요한 선택지를 제거하고 Reward Shaping으로 즉각적인 피드백을 받아 최적의 수를 빠르게 찾아내는 데 집중합니다. | **정확한 기술과 노하우**: 수많은 연습을 통해 터득한 '감'. 어떤 순간에 뒤집고, 언제 불을 빼야 하는지에 대한 정확한 판단력. |
+| **난이도** | **결정적인 한 번의 실수 방지**: 박스 수가 적고 크기가 크기 때문에, 초반에 큰 박스 하나를 잘못 배치하면 남은 공간이 애매해져 다른 박스들이 전혀 들어가지 못하는 상황이 발생한다. 매 순간의 선택이 매우 치명적이다. | **굽기 정도와 타이밍**: 재료는 적지만, 스테이크를 단 한 번에 완벽한 미디엄 레어로 구워야 한다. 너무 익히거나 덜 익히면 요리 전체를 망칩니다. 매 순간의 불 조절이 결정적이다. |
+| **핵심 과제** | **효율적인 탐색과 즉각적인 판단**: MLP 모델은 가볍고 빠르기 때문에, Action Masking으로 불필요한 선택지를 제거하고 Reward Shaping으로 즉각적인 피드백을 받아 최적의 수를 빠르게 찾아내는 데 집중한다. | **정확한 기술과 노하우**: 수많은 연습을 통해 터득한 '감'. 어떤 순간에 뒤집고, 언제 불을 빼야 하는지에 대한 정확한 판단력. |
 
 ---
 
 ### **결론: 난이도의 종류가 다릅니다**
 
--   **논문 (뷔페 요리사)**: **복잡성(Complexity)**이 높은 문제입니다. 수많은 재료(박스)를 조화롭게 구성하는 **'설계 능력'**이 중요합니다.
--   **코드베이스 (스테이크 장인)**: **치명성(Criticality)**이 높은 문제입니다. 단 몇 번의 결정이 최종 결과를 좌우하는 **'정확성'**이 중요합니다.
+-   **논문 (뷔페 요리사)**: **복잡성(Complexity)**이 높은 문제이다. 수많은 재료(박스)를 조화롭게 구성하는 **'설계 능력'**이 중요하다.
+-   **코드베이스 (스테이크 장인)**: **치명성(Criticality)**이 높은 문제이다. 단 몇 번의 결정이 최종 결과를 좌우하는 **'정확성'**이 중요하다.
 
-따라서 코드베이스가 박스 수는 적지만, 각 결정의 중요도가 훨씬 높아 결코 "더 쉬운" 문제라고 할 수 없습니다. 오히려 **다른 종류의 난이도**를 가진 문제이며, 현재 코드베이스는 이 문제에 매우 효과적으로 최적화된 접근법을 사용하고 있습니다.
+따라서 코드베이스가 박스 수는 적지만, 각 결정의 중요도가 훨씬 높아 결코 "더 쉬운" 문제라고 할 수 없습니다. 오히려 **다른 종류의 난이도**를 가진 문제이며, 현재 코드베이스는 이 문제에 매우 효과적으로 최적화된 접근법을 사용하고 있다.
 
 ---
 
@@ -2355,12 +2355,12 @@ RL-3DbinPacking/
 - **목적이 학술적 비교**  
   “Transformer 없이 action-mask + HPO로 어느 정도 따라갈 수 있나?”를 정량적으로 보고 싶다면 시도할 가치가 큽니다.
 - **후속 연구 토대**  
-  결과가 좋다면 *Hybrid(Transformer Light + MaskablePPO)* 개발 근거자료가 됩니다.
+  결과가 좋다면 *Hybrid(Transformer Light + MaskablePPO)* 개발 근거자료가 된다.
 
 ## 3️⃣ “의미가 적다” 케이스
 
 - **실용 서비스 지향**  
-  실제 창고·로봇 양산 라인에서 **12~32개 적재**가 빈번하다면, 200개 실험은 과도한 벤치마크입니다.
+  실제 창고·로봇 양산 라인에서 **12~32개 적재**가 빈번하다면, 200개 실험은 과도한 벤치마크이다.
 - **리소스 제약**  
   GPU 1장, 제한된 학습 시간(≤ 2h) 조건이라면 투자 대비 효용이 낮습니다.
 
@@ -2390,7 +2390,7 @@ RL-3DbinPacking/
 - **연구 목적**이라면 **의미 있음**: MLP+MaskablePPO 확장성이 얼마나 되는지 검증 가능.  
 - **산업·실무 목적**이라면 **우선순위 낮음**: 현재 문제 범위(박스 ≤ 32)에서 이미 목표 초과 달성 ➜ 리소스 대비 추가 가치는 제한적.
 
-즉, **“왜 200개 실험이 필요한가?”**가 분명하다면 추진하고, 아니라면 현 설정 최적화·실제 배포 검증에 집중하는 편이 효율적입니다.
+즉, **“왜 200개 실험이 필요한가?”**가 분명하다면 추진하고, 아니라면 현 설정 최적화·실제 배포 검증에 집중하는 편이 효율적이다.
 
 ```python
     # enhanced_optimization.py / production_final_test.py
@@ -2500,7 +2500,7 @@ reward += max(0, (box_cnt - prev_box_cnt)) * 0.5
 reward += 0.1*(1 - step/max_steps)  # 효율
 # 안정성 보너스, 종료 보너스(+5/+2/+1/-1), 지연/실패 페널티
 ```
-- 비고: `get_action_masks`는 `sb3_contrib`의 유틸을 재사용하며, `ultimate_train_fix.py`에서 `from train_maskable_ppo import get_action_masks`로 참조합니다.
+- 비고: `get_action_masks`는 `sb3_contrib`의 유틸을 재사용하며, `ultimate_train_fix.py`에서 `from train_maskable_ppo import get_action_masks`로 참조한다.
 
 ### `src/ultimate_train_fix.py` (999-step 해결/커리큘럼/HPO/결합지표)
 
@@ -2649,7 +2649,7 @@ item_sizes.extend([box1, box2])  # 부피 보존
 
 **Cursor**
 
-방금 요청하신 체계적 문서화를 위해, 대상 스크립트(`enhanced_optimization.py`, `production_final_test.py`)를 직접 확인하고 인터페이스/흐름/의존성을 정확히 정리하겠습니다. 관련 파일을 동시에 열람합니다.
+방금 요청하신 체계적 문서화를 위해, 대상 스크립트(`enhanced_optimization.py`, `production_final_test.py`)를 직접 확인하고 인터페이스/흐름/의존성을 정확히 정리하겠습니다. 관련 파일을 동시에 열람한다.
 
 ### 문서화 범위
 - 포함: `enhanced_optimization.py`, `production_final_test.py`와 이들이 직접 사용하는 핵심 의존 모듈
