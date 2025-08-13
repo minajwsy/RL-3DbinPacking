@@ -1,0 +1,66 @@
+digraph G {
+concentrate=true;
+splines="ortho";
+rankdir="LR";
+subgraph legend{
+    rank = min;
+    label = "legend";
+    Legend [shape=none, margin=0, label = <
+        <table cellspacing="0" cellpadding="0" border="1"><tr><td>Code2flow Legend</td></tr><tr><td>
+        <table cellspacing="0">
+        <tr><td>Regular function</td><td width="50px" bgcolor='#cccccc'></td></tr>
+        <tr><td>Trunk function (nothing calls this)</td><td bgcolor='#966F33'></td></tr>
+        <tr><td>Leaf function (this calls nothing else)</td><td bgcolor='#6db33f'></td></tr>
+        <tr><td>Function call</td><td><font color='black'>&#8594;</font></td></tr>
+        </table></td></tr></table>
+        >];
+}node_403cdaa0 [label="0: (global)()" name="enhanced_optimization::(global)" shape="rect" style="rounded,filled" fillcolor="#966F33" ];
+node_46cb24b8 [label="137: create_enhanced_environment()" name="enhanced_optimization::EnhancedOptimizer.create_enhanced_environment" shape="rect" style="rounded,filled" fillcolor="#cccccc" ];
+node_f1a959a9 [label="203: get_enhanced_parameter_sets()" name="enhanced_optimization::EnhancedOptimizer.get_enhanced_parameter_sets" shape="rect" style="rounded,filled" fillcolor="#6db33f" ];
+node_45c37be7 [label="437: run_phase4_optimization()" name="enhanced_optimization::EnhancedOptimizer.run_phase4_optimization" shape="rect" style="rounded,filled" fillcolor="#cccccc" ];
+node_279d3eb0 [label="314: train_and_evaluate()" name="enhanced_optimization::EnhancedOptimizer.train_and_evaluate" shape="rect" style="rounded,filled" fillcolor="#cccccc" ];
+node_28f8fd7b [label="642: __init__()" name="enhanced_optimization::EnhancedRewardWrapper.__init__" shape="rect" style="rounded,filled" fillcolor="#6db33f" ];
+node_dc6372f1 [label="647: reset()" name="enhanced_optimization::EnhancedRewardWrapper.reset" shape="rect" style="rounded,filled" fillcolor="#cccccc" ];
+node_f1eaaab1 [label="660: reward()" name="enhanced_optimization::EnhancedRewardWrapper.reward" shape="rect" style="rounded,filled" fillcolor="#cccccc" ];
+node_b378c31e [label="652: step()" name="enhanced_optimization::EnhancedRewardWrapper.step" shape="rect" style="rounded,filled" fillcolor="#cccccc" ];
+node_ff3e7ec6 [label="75: calculate_utilization_and_items()" name="enhanced_optimization::calculate_utilization_and_items" shape="rect" style="rounded,filled" fillcolor="#6db33f" ];
+node_bdb5b1a3 [label="48: get_env_info()" name="enhanced_optimization::get_env_info" shape="rect" style="rounded,filled" fillcolor="#6db33f" ];
+node_dae7f4dd [label="709: main()" name="enhanced_optimization::main" shape="rect" style="rounded,filled" fillcolor="#cccccc" ];
+node_403cdaa0 -> node_dae7f4dd [color="#000000" penwidth="2"];
+node_46cb24b8 -> node_28f8fd7b [color="#000000" penwidth="2"];
+node_45c37be7 -> node_f1a959a9 [color="#CC79A7" penwidth="2"];
+node_45c37be7 -> node_279d3eb0 [color="#CC79A7" penwidth="2"];
+node_279d3eb0 -> node_46cb24b8 [color="#000000" penwidth="2"];
+node_279d3eb0 -> node_46cb24b8 [color="#000000" penwidth="2"];
+node_279d3eb0 -> node_dc6372f1 [color="#000000" penwidth="2"];
+node_279d3eb0 -> node_b378c31e [color="#000000" penwidth="2"];
+node_279d3eb0 -> node_ff3e7ec6 [color="#000000" penwidth="2"];
+node_279d3eb0 -> node_bdb5b1a3 [color="#000000" penwidth="2"];
+node_279d3eb0 -> node_bdb5b1a3 [color="#000000" penwidth="2"];
+node_dc6372f1 -> node_dc6372f1 [color="#E69F00" penwidth="2"];
+node_f1eaaab1 -> node_ff3e7ec6 [color="#E69F00" penwidth="2"];
+node_b378c31e -> node_f1eaaab1 [color="#D55E00" penwidth="2"];
+node_b378c31e -> node_b378c31e [color="#D55E00" penwidth="2"];
+node_dae7f4dd -> node_45c37be7 [color="#0072B2" penwidth="2"];
+subgraph cluster_e395313f {
+    node_bdb5b1a3 node_ff3e7ec6 node_dae7f4dd node_403cdaa0;
+    label="File: enhanced_optimization";
+    name="enhanced_optimization";
+    style="filled";
+    graph[style=dotted];
+    subgraph cluster_0879bf82 {
+        node_46cb24b8 node_f1a959a9 node_279d3eb0 node_45c37be7;
+        label="Class: EnhancedOptimizer";
+        name="EnhancedOptimizer";
+        style="filled";
+        graph[style=dotted];
+    };
+    subgraph cluster_d52dc0df {
+        node_28f8fd7b node_dc6372f1 node_b378c31e node_f1eaaab1;
+        label="Class: EnhancedRewardWrapper";
+        name="EnhancedRewardWrapper";
+        style="filled";
+        graph[style=dotted];
+    };
+};
+}
