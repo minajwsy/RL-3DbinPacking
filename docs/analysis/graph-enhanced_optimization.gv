@@ -1,0 +1,71 @@
+digraph G {
+concentrate=true;
+splines="ortho";
+rankdir="LR";
+subgraph legend{
+    rank = min;
+    label = "legend";
+    Legend [shape=none, margin=0, label = <
+        <table cellspacing="0" cellpadding="0" border="1"><tr><td>Code2flow Legend</td></tr><tr><td>
+        <table cellspacing="0">
+        <tr><td>Regular function</td><td width="50px" bgcolor='#cccccc'></td></tr>
+        <tr><td>Trunk function (nothing calls this)</td><td bgcolor='#966F33'></td></tr>
+        <tr><td>Leaf function (this calls nothing else)</td><td bgcolor='#6db33f'></td></tr>
+        <tr><td>Function call</td><td><font color='black'>&#8594;</font></td></tr>
+        </table></td></tr></table>
+        >];
+}node_83554f8f [label="0: (global)()" name="enhanced_optimization::(global)" shape="rect" style="rounded,filled" fillcolor="#966F33" ];
+node_cf5c28b6 [label="109: __init__()" name="enhanced_optimization::EnhancedOptimizer.__init__" shape="rect" style="rounded,filled" fillcolor="#6db33f" ];
+node_bb90183c [label="137: create_enhanced_environment()" name="enhanced_optimization::EnhancedOptimizer.create_enhanced_environment" shape="rect" style="rounded,filled" fillcolor="#cccccc" ];
+node_666d89af [label="564: create_performance_analysis()" name="enhanced_optimization::EnhancedOptimizer.create_performance_analysis" shape="rect" style="rounded,filled" fillcolor="#6db33f" ];
+node_6f1d1096 [label="203: get_enhanced_parameter_sets()" name="enhanced_optimization::EnhancedOptimizer.get_enhanced_parameter_sets" shape="rect" style="rounded,filled" fillcolor="#6db33f" ];
+node_8e06c0e1 [label="437: run_phase4_optimization()" name="enhanced_optimization::EnhancedOptimizer.run_phase4_optimization" shape="rect" style="rounded,filled" fillcolor="#cccccc" ];
+node_07a8574c [label="314: train_and_evaluate()" name="enhanced_optimization::EnhancedOptimizer.train_and_evaluate" shape="rect" style="rounded,filled" fillcolor="#cccccc" ];
+node_fdba1ca0 [label="642: __init__()" name="enhanced_optimization::EnhancedRewardWrapper.__init__" shape="rect" style="rounded,filled" fillcolor="#6db33f" ];
+node_7df66341 [label="647: reset()" name="enhanced_optimization::EnhancedRewardWrapper.reset" shape="rect" style="rounded,filled" fillcolor="#cccccc" ];
+node_7c19f92a [label="660: reward()" name="enhanced_optimization::EnhancedRewardWrapper.reward" shape="rect" style="rounded,filled" fillcolor="#cccccc" ];
+node_a24d9e13 [label="652: step()" name="enhanced_optimization::EnhancedRewardWrapper.step" shape="rect" style="rounded,filled" fillcolor="#cccccc" ];
+node_f09fea6b [label="75: calculate_utilization_and_items()" name="enhanced_optimization::calculate_utilization_and_items" shape="rect" style="rounded,filled" fillcolor="#6db33f" ];
+node_4063240f [label="48: get_env_info()" name="enhanced_optimization::get_env_info" shape="rect" style="rounded,filled" fillcolor="#6db33f" ];
+node_14fa617c [label="709: main()" name="enhanced_optimization::main" shape="rect" style="rounded,filled" fillcolor="#cccccc" ];
+node_83554f8f -> node_14fa617c [color="#CC79A7" penwidth="2"];
+node_bb90183c -> node_fdba1ca0 [color="#F0E442" penwidth="2"];
+node_8e06c0e1 -> node_6f1d1096 [color="#E69F00" penwidth="2"];
+node_8e06c0e1 -> node_07a8574c [color="#E69F00" penwidth="2"];
+node_07a8574c -> node_bb90183c [color="#F0E442" penwidth="2"];
+node_07a8574c -> node_bb90183c [color="#F0E442" penwidth="2"];
+node_07a8574c -> node_7df66341 [color="#F0E442" penwidth="2"];
+node_07a8574c -> node_a24d9e13 [color="#F0E442" penwidth="2"];
+node_07a8574c -> node_f09fea6b [color="#F0E442" penwidth="2"];
+node_07a8574c -> node_4063240f [color="#F0E442" penwidth="2"];
+node_07a8574c -> node_4063240f [color="#F0E442" penwidth="2"];
+node_7df66341 -> node_7df66341 [color="#E69F00" penwidth="2"];
+node_7c19f92a -> node_f09fea6b [color="#56B4E9" penwidth="2"];
+node_a24d9e13 -> node_7c19f92a [color="#009E73" penwidth="2"];
+node_a24d9e13 -> node_a24d9e13 [color="#009E73" penwidth="2"];
+node_14fa617c -> node_cf5c28b6 [color="#F0E442" penwidth="2"];
+node_14fa617c -> node_666d89af [color="#F0E442" penwidth="2"];
+node_14fa617c -> node_666d89af [color="#F0E442" penwidth="2"];
+node_14fa617c -> node_8e06c0e1 [color="#F0E442" penwidth="2"];
+subgraph cluster_99cae531 {
+    node_4063240f node_f09fea6b node_14fa617c node_83554f8f;
+    label="File: enhanced_optimization";
+    name="enhanced_optimization";
+    style="filled";
+    graph[style=dotted];
+    subgraph cluster_8e71ba56 {
+        node_cf5c28b6 node_bb90183c node_6f1d1096 node_07a8574c node_8e06c0e1 node_666d89af;
+        label="Class: EnhancedOptimizer";
+        name="EnhancedOptimizer";
+        style="filled";
+        graph[style=dotted];
+    };
+    subgraph cluster_721e101a {
+        node_fdba1ca0 node_7df66341 node_a24d9e13 node_7c19f92a;
+        label="Class: EnhancedRewardWrapper";
+        name="EnhancedRewardWrapper";
+        style="filled";
+        graph[style=dotted];
+    };
+};
+}
