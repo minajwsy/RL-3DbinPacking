@@ -1974,7 +1974,54 @@ python production_final_test.py --quick     # 25k step / 30 ep
 
 ## 1. 개요: 논문 vs. 코드베이스
 
-본 코드베이스는 논문에서 제안한 Transformer 기반 정책 대신, 계산 효율성이 높은 **MLP (Multi-Layer Perceptron) 정책**과 **MaskablePPO**를 결합하여 3D Bin Packing 문제를 해결한다. 논문의 핵심 아이디어인 **'Height Map' 상태 표현**과 **'Action Masking'**을 동일하게 채택하여, 경량화된 모델로도 유사한 수준의 성능에 도달하는 것을 목표로 한다.
+본 코드베이스는 논문에서 제안한 Transformer 기반 정책 대신, 계산 효율성이 높은 **MLP (Multi-Layer Perceptron) 정책**과 **MaskablePPO**를 결합하여 3D Bin Packing 문제를 해결한다. 논문의 핵심 아이디어인 **'Height Map' 상태 표현**과 **'Action Masking'**을 동일하게 채택하여, 경량화된 모델로도 유사한 수준의 성능에 도달하는 것을 목표로 한다. -> '커서Q&A0814a-CB구조&동작의개요.md'내용으로 대체!:
+  
+```
+### 코드베이스 구조와 동작 개요
+
+- 핵심 목적
+  - 3D Bin Packing 환경에서 강화학습(Maskable PPO)로 컨테이너 활용률을 최대화.
+  - 상태는 컨테이너 높이맵 + 가시 박스 크기, 행동은 [가시 박스 선택 × XY좌표]의 단일 정수 인덱스.
+
+- 최상위
+  - `enhanced_optimization.py`: Phase 4 하이퍼파라미터 탐색/비교 자동화.
+  - `production_final_test.py`: 최적 설정(Phase 4 결과)으로 학습→평가→결과저장.
+  - `README.md`: 문제정의, 설치, 환경 소개.
+  - `results/`, `models/`, `logs/`, `gifs/`: 실행 산출물 저장.
+
+- src 모듈
+  - `packing_env.py`
+    - Gymnasium 환경 `PackingEnv`: 관찰공간 Dict(height_map, visible_box_sizes), 행동공간 Discrete(lx*ly*visible).
+    - `action_masks()`: 불가능 좌표/박스 조합을 배제하는 마스크 제공.
+    - `calculate_reward(...)`: 종료/중간 보상(활용률 기반).
+  - `train_maskable_ppo.py`
+    - `make_env(...)`: 환경 등록/생성, `ActionMasker` 및 개선형 보상(`ImprovedRewardWrapper`) 적용.
+    - 실시간 대시보드/모니터링 콜백, 학습/평가 유틸 포함.
+  - `utils.py`
+    - `boxes_generator(...)`: 컨테이너 크기에 맞게 박스 시퀀스를 생성(분할 기반).
+  - `packing_kernel.py`
+    - `Container`, `Box` 등 엔진 레벨 로직(배치, 높이맵, 유효성 검사 등).
+  - 기타: `device_utils.py`, `train.py`, `ultimate_train_fix.py`, `vectorized_training.py`, `agents.py` 등 보조/대안 학습 루틴.
+
+- 전체 동작 흐름
+  1) `utils.boxes_generator`로 문제 인스턴스 생성 → 2) `PackingEnv`로 Gym 환경 구성 → 3) `ActionMasker`로 불가능 행동 제거 → 4) 보상 래퍼(개선형/강화형)로 보상 쉐이핑 → 5) `MaskablePPO` 학습 → 6) 다중 에피소드 평가 및 `results/` 저장 → 7) 분석 차트/요약 리포트 생성.
+
+- 실행 방법
+  - 최적화 탐색:
+    - 전체: `python enhanced_optimization_annotated.py --focus all --timesteps 35000`
+    - 안정성/아키텍처/최적화만: `--focus stability|architecture|optimization`
+    - 결과 분석: `--analyze results/phase4_enhanced_*.json`
+  - 프로덕션 최종 테스트:
+    - 완전: `python production_final_test_annotated.py --timesteps 50000 --episodes 50`
+    - 빠른: `python production_final_test_annotated.py --quick`
+  - 루트에서 실행해야 `sys.path.append('src')`가 올바르게 동작합니다.
+
+- 첨부 논문과의 연결
+  - 본 코드는 Transformer 정책 대신 MLP 정책 + MaskablePPO를 사용하지만,
+  - 공통점: 높이맵 기반 상태표현, 불가능행동 마스킹으로 탐색 공간 축소, 활용률 중심 보상 설계, 멀티 시드 다중 에피소드 평가.
+  - 차이점: 논문은 Transformer 기반 정책/시퀀스 모델링을 활용하는 반면, 본 코드는 MLP `net_arch`로 정책/가치망을 구성.
+  ---
+
 
 | 구분 | Heng et al. (논문) | 본 코드베이스 |
 | :--- | :--- | :--- |
