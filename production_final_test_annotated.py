@@ -4,11 +4,11 @@
 
 개요
 - Phase 4 탐색 결과로 얻은 최적 하이퍼파라미터(`PRODUCTION_OPTIMAL`)로 학습/평가를 수행해
-  재현성·안정성을 점검합니다.
+  재현성·안정성을 점검한다.
 - 환경은 `src/train_maskable_ppo.make_env`를 통해 생성되며, 불가능 행동 마스킹과 개선형 보상
-  쉐이핑을 사용합니다.
+  쉐이핑을 사용한다.
 - 논문 맥락: Transformer 기반 DRL과 달리 본 코드는 MLP+MaskablePPO를 사용하지만,
-  상태표현(높이맵+가시박스), 불가능행동 마스킹, 보상 설계를 통해 효율적 탐색이라는 공통 목표를 지향합니다.
+  상태 표현(높이맵+가시박스), 불가능행동 마스킹, 보상 설계를 통해 효율적 탐색이라는 공통 목표를 지향한다.
 
 사용 방법(예)
 - 완전 테스트: python production_final_test_annotated.py --timesteps 50000 --episodes 50
@@ -298,10 +298,8 @@ def main():
     success = production_final_test(timesteps, episodes)
     total_time = time.time() - start_time
     print(f"\n⏱️ 총 소요 시간: {total_time/60:.1f}분")
-    print("🎉 프로덕션 최종 테스트 성공!" if success else "📈 성능 개선이 필요합니다.")
+    print("🎉 프로덕션 최종 테스트 성공!" if success else "📈 성능 개선이 필요하다.")
 
 
 if __name__ == "__main__":
     main()
-
-

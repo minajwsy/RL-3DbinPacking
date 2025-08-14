@@ -4,16 +4,16 @@
 
 개요
 - 본 스크립트는 Maskable PPO를 활용해 3D 빈패킹 환경(`src/packing_env.py`)에서
-  다양한 하이퍼파라미터 구성의 성능을 비교·평가합니다.
+  다양한 하이퍼파라미터 구성의 성능을 비교·평가한다.
 - 관찰(Observation)은 컨테이너 상단 높이맵과 가시 박스의 크기 벡터이며,
-  행동(Action)은 [가시 박스 선택 × XY 좌표]의 단일 정수 index로 디스크리트화됩니다.
+  행동(Action)은 [가시 박스 선택 × XY 좌표]의 단일 정수 index로 디스크리트화된다.
 - 논문 맥락: 첨부 문헌(Transformer 기반 DRL)과 달리 본 코드는 MLP 기반 MaskablePPO를 사용하지만,
-  공통적으로 높이맵 기반 상태표현, 불가능행동 마스킹, 보상 쉐이핑을 통해 탐색 공간을 줄이고 안정적 학습을 지향합니다.
+  공통적으로 높이맵 기반 상태표현, 불가능행동 마스킹, 보상 쉐이핑을 통해 탐색 공간을 줄이고 안정적 학습을 지향한다.
 
 사용 방법(예)
 - 모든 세트 실험:  python enhanced_optimization_annotated.py --focus all --timesteps 35000
 - 안정성 중심:     python enhanced_optimization_annotated.py --focus stability
-- 결과 분석만:      python enhanced_optimization_annotated.py --analyze results/phase4_enhanced_*.json
+- 결과 분석만:     python enhanced_optimization_annotated.py --analyze results/phase4_enhanced_*.json
 
 출력
 - `results/phase4_enhanced_{focus}_{timestamp}.json` 종합 결과와 `_analysis.png` 차트를 자동 저장
@@ -44,9 +44,9 @@ import matplotlib.pyplot as plt
 
 # 프로젝트 핵심 모듈 로드
 try:
-    from packing_env import PackingEnv  # 상태·행동 정의된 Gym 환경
+    from packing_env import PackingEnv                    # 상태·행동 정의된 Gym 환경
     from train_maskable_ppo import ImprovedRewardWrapper  # 개선형 보상 래퍼
-    from utils import boxes_generator  # 문제 인스턴스(박스 시퀀스) 생성기
+    from utils import boxes_generator                     # 문제 인스턴스(박스 시퀀스) 생성기
     print("✅ 모든 모듈 import 성공")
 except ImportError as e:
     print(f"❌ Import 오류: {e}")
@@ -535,7 +535,7 @@ class EnhancedOptimizer:
             print(f"⏱️ 총 소요 시간: {total_time/60:.1f}분")
             return output_data
         else:
-            print("❌ 유효한 결과가 없습니다.")
+            print("❌ 유효한 결과가 없다.")
             return {}
 
     def create_performance_analysis(self, results_file: str):
@@ -544,7 +544,7 @@ class EnhancedOptimizer:
             with open(results_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             if not data.get('results'):
-                print("분석할 결과가 없습니다.")
+                print("분석할 결과가 없다.")
                 return
 
             configs, scores, utilizations, success_rates = [], [], [], []
@@ -674,7 +674,7 @@ def main():
             best_score = result['best_score']
             target_score = result['target_score']
             if best_score >= target_score:
-                print(f"\n🎉 축하합니다! 목표 {target_score}점을 달성했습니다!")
+                print(f"\n🎉 축하! 목표 {target_score}점 달성!")
                 print(f"🏆 최종 성능: {best_score:.3f}점")
             else:
                 remaining = target_score - best_score
