@@ -1968,7 +1968,7 @@ python production_final_test.py --quick     # 25k step / 30 ep
 #### **Cursor** OK. `enhanced_optimization.py`와 `production_final_test.py`의 최신 실행과 직접적으로 관련된 파일들만 선별하고, 첨부해주신 논문 「Online 3D Bin Packing via Transformer-Based DRL」의 핵심 개념과 연관지어 코드베이스를 체계적으로 문서화한다.
 ---
 
-# 📚 RL-3DbinPacking 코드베이스 핵심 문서 (v4 -> 문서화할 최종 자료!)
+# 📚 RL-3DbinPacking 코드 동작 기술서 (v4 -> 문서화할 최종 자료!)
 > • **문서화 대상**: `enhanced_optimization.py`, `production_final_test.py` 최신 실행에 직접 호출·참조된 파일  
 > • **참고 문헌**: Heng et al., "Online 3D Bin Packing via Transformer-Based DRL"
 
@@ -1976,7 +1976,6 @@ python production_final_test.py --quick     # 25k step / 30 ep
 
 본 코드베이스는 논문에서 제안한 Transformer 기반 정책 대신, 계산 효율성이 높은 **MLP (Multi-Layer Perceptron) 정책**과 **MaskablePPO**를 결합하여 3D Bin Packing 문제를 해결한다. 논문의 핵심 아이디어인 **'Height Map' 상태 표현**과 **'Action Masking'**을 동일하게 채택하여, 경량화된 모델로도 유사한 수준의 성능에 도달하는 것을 목표로 한다. -> '커서Q&A0814a-CB구조&동작의개요.md'내용으로 대체!:
   
-```
 ### 코드베이스 구조와 동작 개요
 
 - 핵심 목적
@@ -2020,8 +2019,7 @@ python production_final_test.py --quick     # 25k step / 30 ep
   - 본 코드는 Transformer 정책 대신 MLP 정책 + MaskablePPO를 사용하지만,
   - 공통점: 높이맵 기반 상태표현, 불가능행동 마스킹으로 탐색 공간 축소, 활용률 중심 보상 설계, 멀티 시드 다중 에피소드 평가.
   - 차이점: 논문은 Transformer 기반 정책/시퀀스 모델링을 활용하는 반면, 본 코드는 MLP `net_arch`로 정책/가치망을 구성.
-  ---
-
+---  
 
 | 구분 | Heng et al. (논문) | 본 코드베이스 |
 | :--- | :--- | :--- |
