@@ -11,6 +11,7 @@ import time
 import numpy as np
 from datetime import datetime
 import warnings
+import io
 
 # 환경 설정
 os.environ['CUDA_VISIBLE_DEVICES'] = ''
@@ -181,6 +182,179 @@ def evaluate_production_model(model, container_size=[10, 10, 10], num_boxes=12, 
     
     return results
 
+def _render_env_frame_3d(env, step_num=0, fig_size_px=(1200, 1200)):
+    """matplotlib을 사용해 현재 환경 상태를 1200x1200 PNG 이미지로 렌더링 후 PIL Image 반환"""
+    try:
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+        from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+        from PIL import Image
+
+        # 컨테이너 크기
+        container_size = getattr(env.unwrapped, 'container').size
+
+        # 1200x1200 보장: inches * dpi = pixels
+        target_w, target_h = fig_size_px
+        dpi = 100
+        fig_w_in, fig_h_in = target_w / dpi, target_h / dpi
+
+        fig = plt.figure(figsize=(fig_w_in, fig_h_in), dpi=dpi)
+        ax = fig.add_subplot(111, projection='3d')
+
+        # 컨테이너 모서리와 에지 그리기
+        corners = [
+            [0, 0, 0], [container_size[0], 0, 0],
+            [container_size[0], container_size[1], 0], [0, container_size[1], 0],
+            [0, 0, container_size[2]], [container_size[0], 0, container_size[2]],
+            [container_size[0], container_size[1], container_size[2]], [0, container_size[1], container_size[2]]
+        ]
+        for cx, cy, cz in corners:
+            ax.scatter(cx, cy, cz, color='red', s=20, alpha=0.8)
+
+        edges = [
+            ([0, container_size[0]], [0, 0], [0, 0]),
+            ([container_size[0], container_size[0]], [0, container_size[1]], [0, 0]),
+            ([container_size[0], 0], [container_size[1], container_size[1]], [0, 0]),
+            ([0, 0], [container_size[1], 0], [0, 0]),
+            ([0, container_size[0]], [0, 0], [container_size[2], container_size[2]]),
+            ([container_size[0], container_size[0]], [0, container_size[1]], [container_size[2], container_size[2]]),
+            ([container_size[0], 0], [container_size[1], container_size[1]], [container_size[2], container_size[2]]),
+            ([0, 0], [container_size[1], 0], [container_size[2], container_size[2]]),
+            ([0, 0], [0, 0], [0, container_size[2]]),
+            ([container_size[0], container_size[0]], [0, 0], [0, container_size[2]]),
+            ([container_size[0], container_size[0]], [container_size[1], container_size[1]], [0, container_size[2]]),
+            ([0, 0], [container_size[1], container_size[1]], [0, container_size[2]])
+        ]
+        for ex, ey, ez in edges:
+            ax.plot(ex, ey, ez, 'r-', alpha=0.35, linewidth=1)
+
+        # 배치된 박스 그리기 (env.unwrapped.packed_boxes 사용)
+        packed_boxes = getattr(env.unwrapped, 'packed_boxes', [])
+        if packed_boxes:
+            colors = plt.cm.Set3(np.linspace(0, 1, len(packed_boxes)))
+            for idx, box in enumerate(packed_boxes):
+                x, y, z = box.position
+                dx, dy, dz = box.size
+                vertices = [
+                    [x, y, z], [x+dx, y, z], [x+dx, y+dy, z], [x, y+dy, z],
+                    [x, y, z+dz], [x+dx, y, z+dz], [x+dx, y+dy, z+dz], [x, y+dy, z+dz]
+                ]
+                faces = [
+                    [vertices[0], vertices[1], vertices[2], vertices[3]],
+                    [vertices[4], vertices[5], vertices[6], vertices[7]],
+                    [vertices[0], vertices[1], vertices[5], vertices[4]],
+                    [vertices[2], vertices[3], vertices[7], vertices[6]],
+                    [vertices[0], vertices[3], vertices[7], vertices[4]],
+                    [vertices[1], vertices[2], vertices[6], vertices[5]]
+                ]
+                pc = Poly3DCollection(faces, facecolor=colors[idx], edgecolor='black', alpha=0.8, linewidth=0.5)
+                ax.add_collection3d(pc)
+
+        ax.set_xlabel('X (Depth)')
+        ax.set_ylabel('Y (Length)')
+        ax.set_zlabel('Z (Height)')
+        ax.set_xlim(0, container_size[0])
+        ax.set_ylim(0, container_size[1])
+        ax.set_zlim(0, container_size[2])
+        ax.set_title(f'3D Bin Packing - Step {step_num}\n'
+                     f'Packed: {len(packed_boxes)}  Container: {container_size}', fontsize=10)
+        ax.grid(True, alpha=0.3)
+        ax.view_init(elev=25, azim=45)
+        plt.tight_layout()
+
+        buf = io.BytesIO()
+        plt.savefig(buf, format='png', dpi=dpi, bbox_inches='tight', facecolor='white')
+        buf.seek(0)
+        img = Image.open(buf)
+        plt.close(fig)
+        return img
+    except Exception:
+        try:
+            from PIL import Image
+            return Image.new('RGB', (1200, 1200), color='white')
+        except Exception:
+            return None
+
+def save_gif_like_train15(frames, out_path):
+    """train_15_boxes.gif 형식과 동일하게 저장 (1200x1200, 11프레임, 300ms/마지막 2100ms, loop=10)"""
+    from PIL import Image
+
+    if not frames:
+        return False
+
+    # 프레임 수를 11개로 맞춤: 부족하면 마지막 프레임 반복, 많으면 잘라냄
+    target_frames = 11
+    if len(frames) < target_frames:
+        frames = frames + [frames[-1]] * (target_frames - len(frames))
+    elif len(frames) > target_frames:
+        frames = frames[:target_frames]
+
+    # 크기 1200x1200으로 강제
+    resized = [f.resize((1200, 1200)) for f in frames]
+
+    # durations: 앞 10프레임 300ms, 마지막 2100ms
+    durations = [300] * (target_frames - 1) + [2100]
+
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    try:
+        resized[0].save(
+            out_path,
+            format='GIF',
+            append_images=resized[1:],
+            save_all=True,
+            duration=durations,
+            loop=10,  # train_15_boxes.gif와 동일
+            optimize=True
+        )
+        return True
+    except Exception:
+        return False
+
+def generate_production_demo_gif(model, container_size=[10,10,10], num_boxes=12, max_steps=10, out_name='production_final_demo.gif'):
+    """모델로 데모 실행하여 train_15_boxes.gif와 동일 포맷의 GIF 생성"""
+    try:
+        from sb3_contrib.common.maskable.utils import get_action_masks
+    except Exception:
+        get_action_masks = None
+
+    env = create_production_env(container_size, num_boxes, seed=777)
+    if env is None:
+        return False
+
+    frames = []
+    try:
+        obs, _ = env.reset(seed=777)
+        frames.append(_render_env_frame_3d(env, step_num=0))
+
+        done = False
+        truncated = False
+        step = 0
+
+        while not (done or truncated) and step < max_steps:
+            try:
+                if get_action_masks is not None:
+                    masks = get_action_masks(env)
+                    action, _ = model.predict(obs, action_masks=masks, deterministic=True)
+                else:
+                    action, _ = model.predict(obs, deterministic=True)
+
+                obs, reward, done, truncated, info = env.step(action)
+                step += 1
+                frames.append(_render_env_frame_3d(env, step_num=step))
+            except Exception:
+                break
+    finally:
+        env.close()
+
+    out_path = os.path.join('gifs', out_name)
+    ok = save_gif_like_train15(frames, out_path)
+    if ok:
+        print(f"🎬 데모 GIF 생성 완료: {out_path}")
+    else:
+        print("⚠️ 데모 GIF 생성 실패")
+    return ok
+
 def production_final_test(timesteps=50000, eval_episodes=50):
     """프로덕션 최종 테스트 실행"""
     print("🏆 프로덕션 최적 설정 최종 검증 시작")
@@ -262,6 +436,26 @@ def production_final_test(timesteps=50000, eval_episodes=50):
         json.dump(final_results, f, indent=2, default=str)
     
     print(f"\n💾 상세 결과 저장: {results_file}")
+    
+    # === 3단계: train_15_boxes.gif와 동일 형식의 데모 GIF 생성 ===
+    try:
+        demo_ok = generate_production_demo_gif(
+            model,
+            container_size=container_size,
+            num_boxes=num_boxes,
+            max_steps=10,  # 총 11프레임 (초기 + 10스텝)
+            out_name='production_final_demo.gif'
+        )
+        if demo_ok:
+            # 검증 출력: 프레임 수/loop/duration 확인
+            try:
+                from PIL import Image
+                img = Image.open('gifs/production_final_demo.gif')
+                print(f"🖼️ GIF 검증: size={img.size}, frames={getattr(img,'n_frames',1)}, loop={img.info.get('loop')}")
+            except Exception:
+                pass
+    except Exception as _:
+        print("⚠️ 데모 GIF 생성 중 예외 발생 (무시하고 진행)")
     
     return results['combined_score'] >= 18.57
 
