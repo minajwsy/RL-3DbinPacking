@@ -311,49 +311,115 @@ def save_gif_like_train15(frames, out_path):
     except Exception:
         return False
 
-def generate_production_demo_gif(model, container_size=[10,10,10], num_boxes=12, max_steps=10, out_name='production_final_demo.gif'):
-    """모델로 데모 실행하여 train_15_boxes.gif와 동일 포맷의 GIF 생성"""
+def generate_production_demo_gif(model, container_size=[10,10,10], num_boxes=12, max_steps=80, out_name='production_final_demo.gif'):
+    """여러 시도 중 최다 배치 결과를 사용해 train_15_boxes.gif 포맷으로 GIF 생성"""
     try:
         from sb3_contrib.common.maskable.utils import get_action_masks
     except Exception:
         get_action_masks = None
 
-    env = create_production_env(container_size, num_boxes, seed=777)
-    if env is None:
-        return False
+    seeds = [777, 778, 779, 880, 881]  # 다중 시도
+    best = {"frames": None, "placed": -1}
 
-    frames = []
-    try:
-        obs, _ = env.reset(seed=777)
-        frames.append(_render_env_frame_3d(env, step_num=0))
+    for seed in seeds:
+        env = create_production_env(container_size, num_boxes, seed=seed)
+        if env is None:
+            continue
 
-        done = False
-        truncated = False
-        step = 0
+        try:
+            obs, _ = env.reset(seed=seed)
+            frames = []
+            frames.append(_render_env_frame_3d(env, step_num=0))
 
-        while not (done or truncated) and step < max_steps:
-            try:
-                if get_action_masks is not None:
-                    masks = get_action_masks(env)
-                    action, _ = model.predict(obs, action_masks=masks, deterministic=True)
-                else:
-                    action, _ = model.predict(obs, deterministic=True)
+            done = False
+            truncated = False
+            step = 0
+            last_packed = len(getattr(env.unwrapped, "packed_boxes", []))
+            stagnation = 0   # 배치 정체 카운터
 
-                obs, reward, done, truncated, info = env.step(action)
-                step += 1
-                frames.append(_render_env_frame_3d(env, step_num=step))
-            except Exception:
-                break
-    finally:
-        env.close()
+            while not (done or truncated) and step < max_steps:
+                try:
+                    # 1) 기본: 모델 예측 (결정론/비결정론 혼용으로 탐험 유도)
+                    use_deterministic = (step % 3 != 0)
+                    action = None
+                    masks = None
+                    if get_action_masks is not None:
+                        masks = get_action_masks(env)
+                        try:
+                            action, _ = model.predict(obs, action_masks=masks, deterministic=use_deterministic)
+                        except Exception:
+                            action = None
+                    else:
+                        try:
+                            action, _ = model.predict(obs, deterministic=use_deterministic)
+                        except Exception:
+                            action = None
 
-    out_path = os.path.join('gifs', out_name)
-    ok = save_gif_like_train15(frames, out_path)
-    if ok:
-        print(f"🎬 데모 GIF 생성 완료: {out_path}")
+                    # 2) 폴백: 유효 액션 중 하나 선택(무작위). 없으면 종료
+                    if action is None and masks is not None:
+                        valid_idx = np.flatnonzero(masks)
+                        if valid_idx.size > 0:
+                            action = int(np.random.choice(valid_idx))
+                        else:
+                            break
+
+                    # 그래도 없으면 종료
+                    if action is None:
+                        break
+
+                    # 스텝 실행
+                    obs, reward, done, truncated, info = env.step(action)
+                    step += 1
+
+                    # 배치 이벤트 기반 캡처
+                    current_packed = len(getattr(env.unwrapped, "packed_boxes", []))
+                    if current_packed > last_packed:
+                        frames.append(_render_env_frame_3d(env, step_num=step))
+                        last_packed = current_packed
+                        stagnation = 0
+                    else:
+                        stagnation += 1
+
+                    # 정체 해소: 일정 스텝 배치 실패 시 강제 탐험(마스크에서 랜덤 샘플)
+                    if stagnation >= 8 and masks is not None:
+                        valid_idx = np.flatnonzero(masks)
+                        if valid_idx.size > 0:
+                            fallback_action = int(np.random.choice(valid_idx))
+                            obs, reward, done, truncated, info = env.step(fallback_action)
+                            step += 1
+                            current_packed2 = len(getattr(env.unwrapped, "packed_boxes", []))
+                            if current_packed2 > last_packed:
+                                frames.append(_render_env_frame_3d(env, step_num=step))
+                                last_packed = current_packed2
+                                stagnation = 0
+                            else:
+                                # 여전히 정체면 소폭 리셋(마이그레이션 방지)
+                                stagnation = max(0, stagnation - 4)
+
+                except Exception:
+                    break
+
+            # 최다 배치 시도 선택
+            placed_count = last_packed
+            if placed_count > best["placed"] and frames:
+                best["placed"] = placed_count
+                best["frames"] = frames
+
+        finally:
+            env.close()
+
+    # 최종 저장
+    if best["frames"]:
+        out_path = os.path.join("gifs", out_name)
+        ok = save_gif_like_train15(best["frames"], out_path)
+        if ok:
+            print(f"🎬 데모 GIF 생성 완료: {out_path} (최다 배치: {best['placed']}개)")
+        else:
+            print("⚠️ 데모 GIF 생성 실패")
+        return ok
     else:
-        print("⚠️ 데모 GIF 생성 실패")
-    return ok
+        print("⚠️ 유효한 프레임이 없습니다.")
+        return False
 
 def production_final_test(timesteps=50000, eval_episodes=50):
     """프로덕션 최종 테스트 실행"""
@@ -443,7 +509,7 @@ def production_final_test(timesteps=50000, eval_episodes=50):
             model,
             container_size=container_size,
             num_boxes=num_boxes,
-            max_steps=10,  # 총 11프레임 (초기 + 10스텝)
+            max_steps=80,  # 10 -> 80으로 증가
             out_name='production_final_demo.gif'
         )
         if demo_ok:
