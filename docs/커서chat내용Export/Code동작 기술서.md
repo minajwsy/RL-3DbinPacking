@@ -5,7 +5,7 @@
 **Cursor**
 ## 📊 **상세 성능 비교: 논문 (Heng et al.) vs. 코드베이스**
 
-첨부해주신 논문 "Online 3D Bin Packing via Transformer-Based DRL"과 현재 코드베이스의 성능을 심층적으로 비교 분석해 드리겠습니다.
+첨부해주신 논문 "Online 3D Bin Packing via Transformer-Based DRL"과 현재 코드베이스의 성능을 심층적으로 비교 분석해 드리겠다.
 
 ### 1. 개요 및 핵심 접근 방식의 차이
 
@@ -46,7 +46,7 @@
     이 스크립트는 본 프로젝트의 핵심 자산이다. 8가지가 넘는 하이퍼파라미터 조합을 자동으로 테스트하고, 결과를 시각화하여 최적의 설정(`PRODUCTION_OPTIMAL`)을 과학적으로 도출했습니다. 이는 주먹구구식 튜닝을 배제하고 재현 가능한 성능 향상을 이끌었습니다.
 
 3.  **Action Masking의 효과적인 활용**:
-    논문의 핵심 아이디어인 Action Masking을 `MaskablePPO` 라이브러리를 통해 효과적으로 구현했습니다. 이를 통해 MLP 정책이 탐색해야 할 행동 공간을 대폭 줄여, 학습 효율을 극대화했습니다.
+    논문의 핵심 아이디어인 Action Masking을 `MaskablePPO` 라이브러리를 통해 효과적으로 구현했습니다. 이를 통해 MLP 정책이 탐색해야 할 액션 공간을 대폭 줄여, 학습 효율을 극대화했습니다.
 
 ---
 
@@ -73,7 +73,7 @@
 
 아래 비교는 첨부하신 논문 “Online 3D Bin Packing via Transformer-Based DRL” (Heng et al.)과 현재 코드베이스(MLP + MaskablePPO)의 **모델 구조·훈련 전략·평가지표·정량 결과·학습 효율성**을 항목별로 상세 분석한 것이다.  
 
-> 주의 ① – 두 시스템은 **평가 환경과 지표**가 완전히 동일하지 않습니다.  
+> 주의 ① – 두 시스템은 **평가 환경과 지표**가 완전히 동일하지 않는다.  
 > 주의 ② – 논문의 구체적 숫자는 본문·부록 표를 기준으로 요약-인용했습니다. (표기 ≈ : 대략값)  
 
 ---
@@ -215,7 +215,7 @@
 
 ## 📦 **박스 수와 난이도 비교: 논문 vs. 코드베이스**
 
-두 시나리오의 차이를 **“요리”**에 비유하여 알기 쉽게 설명해 드리겠습니다.
+두 시나리오의 차이를 **“요리”**에 비유하여 알기 쉽게 설명해 드리겠다.
 
 ### **논문 (Transformer)의 경우**
 > **“뷔페 요리사”: 200가지 재료로 최고의 코스 요리 만들기**
@@ -246,7 +246,7 @@
 -   **논문 (뷔페 요리사)**: **복잡성(Complexity)**이 높은 문제이다. 수많은 재료(박스)를 조화롭게 구성하는 **'설계 능력'**이 중요하다.
 -   **코드베이스 (스테이크 장인)**: **치명성(Criticality)**이 높은 문제이다. 단 몇 번의 결정이 최종 결과를 좌우하는 **'정확성'**이 중요하다.
 
-따라서 코드베이스가 박스 수는 적지만, 각 결정의 중요도가 훨씬 높아 결코 "더 쉬운" 문제라고 할 수 없습니다. 오히려 **다른 종류의 난이도**를 가진 문제이며, 현재 코드베이스는 이 문제에 매우 효과적으로 최적화된 접근법을 사용하고 있다.
+따라서 코드베이스가 박스 수는 적지만, 각 결정의 중요도가 훨씬 높아 결코 "더 쉬운" 문제라고 할 수 없다. 오히려 **다른 종류의 난이도**를 가진 문제이며, 현재 코드베이스는 이 문제에 매우 효과적으로 최적화된 접근법을 사용하고 있다.
 
 ---
 
@@ -308,7 +308,7 @@
 ## 4️⃣ 권장 시나리오
 
 1. **Stage-1 (파일럿)**   
-    컨테이너 10³, **box = 64** 로 늘려 “규모 확대 효과”만 빠르게 관찰 (25k step).  
+    컨테이너 10³, **box = 64** 로 늘려 “규모 확대 효과”만 빠르게 관측 (25k step).  
 2. **Stage-2 (본 실험)**   
     64에서 유의미한 성능을 유지하면 128 → 200으로 단계 확장.  
 3. **필수 수정** (요약)  
@@ -381,7 +381,7 @@ production_final_test.py      # 프로덕션 최종 검증 스크립트
   - **역할**: 3D Bin Packing Gymnasium 환경
   - **주요 클래스**:
     - `PackingEnv`: 메인 환경 클래스
-  - **관찰 공간**: 
+  - **관측 공간**: 
     - `height_map`: 컨테이너 높이 맵
     - `visible_box_sizes`: 다음 박스들의 크기
   - **액션 공간**: `Discrete(container_size[0] * container_size[1] * 6)`
@@ -458,7 +458,7 @@ production_final_test.py
 
 ### **환경 관련**
 ```python
-# 관찰 공간
+# 관측 공간
 observation = {
     'height_map': np.array(shape=(W, H), dtype=int),  # 높이 맵
     'visible_box_sizes': np.array(shape=(N, 3), dtype=int)  # 박스 크기들
@@ -680,7 +680,7 @@ production_final_test.py
 ```
 
 ```python
-# 관찰 공간
+# 관측 공간
 observation = {
     'height_map': np.array(shape=(W, H), dtype=int),  # 높이 맵
     'visible_box_sizes': np.array(shape=(N, 3), dtype=int)  # 박스 크기들
@@ -828,7 +828,7 @@ results = evaluate_production_model(
 ### 3. 핵심 모듈 상세
 
 - 핵심 개념 맵
-  - 관찰/행동/보상/마스킹은 `src/packing_env.py`가 노출
+  - 관측/액션/보상/마스킹은 `src/packing_env.py`가 노출
   - 기하·검증·마스크 원천 로직은 `src/packing_kernel.py`가 담당
   - 학습 파이프라인/보상 쉐이핑/마스킹 래핑은 `src/train_maskable_ppo.py`의 `make_env`와 `ImprovedRewardWrapper`
   - 999-step 해소/커리큘럼/HPO/결합지표는 `src/ultimate_train_fix.py`
@@ -866,9 +866,9 @@ self.height_map[
 ] += box.size[2]
 ```
 
-### `src/packing_env.py` (Gym 환경/관찰·행동·보상/마스크 노출)
+### `src/packing_env.py` (Gym 환경/관측·액션·보상/마스크 노출)
 
-- 관찰/행동 공간
+- 관측/액션 공간
 ```147:158:src/packing_env.py
 observation_space = Dict({
   "height_map": MultiDiscrete(... X*Y ...),
@@ -876,7 +876,7 @@ observation_space = Dict({
 })
 action_space = Discrete(X * Y * K)
 ```
-- 행동 인코딩/디코딩
+- 액션 인코딩/디코딩
 ```185:206:src/packing_env.py
 box_index = action // (X*Y)
 res = action % (X*Y)
@@ -1064,7 +1064,7 @@ item_sizes.extend([box1, box2])  # 부피 보존
 
 **Cursor**
 
-방금 요청하신 체계적 문서화를 위해, 대상 스크립트(`enhanced_optimization.py`, `production_final_test.py`)를 직접 확인하고 인터페이스/흐름/의존성을 정확히 정리하겠습니다. 관련 파일을 동시에 열람한다.
+방금 요청하신 체계적 문서화를 위해, 대상 스크립트(`enhanced_optimization.py`, `production_final_test.py`)를 직접 확인하고 인터페이스/흐름/의존성을 정확히 정리하기로 한다. 관련 파일을 동시에 열람한다.
 
 ### 문서화 범위
 - 포함: `enhanced_optimization.py`, `production_final_test.py`와 이들이 직접 사용하는 핵심 의존 모듈
@@ -1176,7 +1176,7 @@ python production_final_test.py --quick
 
 ### 3) 핵심 의존 모듈(요약)
 
-- 관찰/행동/마스킹/보상
+- 관측/액션/마스킹/보상
 ```147:158:src/packing_env.py
 observation_space = Dict({"height_map": MultiDiscrete(...), "visible_box_sizes": MultiDiscrete(...)})
 action_space = Discrete(container_size[0] * container_size[1] * num_visible_boxes)
@@ -1245,7 +1245,7 @@ def boxes_generator(bin_size, num_items=..., seed=...):
 - 요약
   - `enhanced_optimization.py`: 전략군 기반 자동 학습·평가·랭킹, SUR 중심 결합 점수, 강화 보상 옵션
   - `production_final_test.py`: 최적 설정 50k 학습→50ep 평가로 최종 재현
-  - 핵심 의존: `PackingEnv`(관찰/행동/보상), `Container`(Feasibility/마스크), `make_env`(보상/마스커), `boxes_generator`(스트림)
+  - 핵심 의존: `PackingEnv`(관측/액션/보상), `Container`(Feasibility/마스크), `make_env`(보상/마스커), `boxes_generator`(스트림)
   - 논문 대비: SUR·Feasibility·온라인성은 대응, 모델은 Transformer→MLP로 실용 구현
 
 ```python
@@ -1385,7 +1385,7 @@ production_final_test.py      # 프로덕션 최종 검증 스크립트
 - **`packing_env.py`**
   - **역할**: 3D Bin Packing 문제를 위한 Gymnasium 호환 환경을 정의한다.
   - **주요 클래스**: `PackingEnv`
-  - **관찰 공간 (Observation Space)**: 
+  - **관측 공간 (Observation Space)**: 
     - `height_map`: 컨테이너의 2D 높이 맵 (Top-down view)
     - `visible_box_sizes`: 다음에 배치해야 할 박스들의 크기 정보
   - **액션 공간 (Action Space)**: `Discrete` 공간. 박스의 위치(x, y)와 회전(6가지)을 조합한 단일 정수 값.
@@ -1639,8 +1639,8 @@ python production_final_test.py --quick
 
 | 모듈 | 설명 | 스크립트에서의 사용 |
 |------|------|--------------------|
-| **`train_maskable_ppo.py`** | Maskable PPO 학습 엔진 <br>• `make_env()` 환경생성 <br>• `get_action_masks()` 행동마스크 <br>• `ImprovedRewardWrapper` 개선보상 | 두 스크립트 모두 환경·마스크·보상 래퍼를 import |
-| **`packing_env.py`** | `PackingEnv` Gymnasium 환경 <br>관찰 : `height_map`, `visible_box_sizes` <br>액션 : 박스선택·좌표·회전(Discrete) | `make_env()` 내부에서 사용 |
+| **`train_maskable_ppo.py`** | Maskable PPO 학습 엔진 <br>• `make_env()` 환경생성 <br>• `get_action_masks()` 액션마스크 <br>• `ImprovedRewardWrapper` 개선보상 | 두 스크립트 모두 환경·마스크·보상 래퍼를 import |
+| **`packing_env.py`** | `PackingEnv` Gymnasium 환경 <br>관측 : `height_map`, `visible_box_sizes` <br>액션 : 박스선택·좌표·회전(Discrete) | `make_env()` 내부에서 사용 |
 | **`packing_kernel.py`** | 3D 박스/컨테이너 로우-레벨 로직 <br>`Box`, `Container` 클래스 및 충돌검사 | `PackingEnv` 내부 로직 |
 | **`utils.py`** | 보조 함수 <br>• `boxes_generator()` 랜덤 박스 <br>• 기하 함수들 | `train_maskable_ppo.py` → 박스 생성 |
 | **`device_utils.py`** | GPU/CPU 자동 선택, 기본 HP 추천 | 두 스크립트가 시스템 정보/디바이스 로그에 사용 |
@@ -1874,7 +1874,7 @@ graph LR
 
 | 항목 | 정의 | 논문 식 |
 |------|------|---------|
-| **관찰** `obs` | `height_map ∈ ℤ^{W×H}`, `visible_box_sizes ∈ ℤ^{N×3}` | 논문 Eq.(1) State  |
+| **관측** `obs` | `height_map ∈ ℤ^{W×H}`, `visible_box_sizes ∈ ℤ^{N×3}` | 논문 Eq.(1) State  |
 | **액션** `a` | `0 … (W·H·N·6−1)` → (box-id, x, y, rot) | 논문 Eq.(2) Discrete Action  |
 | **Action Mask** `m ∈ {0,1}^{|A|}` | `get_action_masks()`에서 충돌·경계 검사 후 Feasible=1 | 논문 Fig. 3 Mask  |
 | **Reward** `r` | `0` ~ `1` (단말 시 이용률) + Improvised shaping | 논문 Eq.(3)  |
@@ -1976,11 +1976,11 @@ python production_final_test.py --quick     # 25k step / 30 ep
 
 본 코드베이스는 논문에서 제안한 Transformer 기반 정책 대신, 계산 효율성이 높은 **MLP (Multi-Layer Perceptron) 정책**과 **MaskablePPO**를 결합하여 3D Bin Packing 문제를 해결한다. 논문의 핵심 아이디어인 **'Height Map' 상태 표현**과 **'Action Masking'**을 동일하게 채택하여, 경량화된 모델로도 유사한 수준의 성능에 도달하는 것을 목표로 한다. -> '커서Q&A0814a-CB구조&동작의개요.md'내용으로 대체!:
   
-### 코드베이스 구조와 동작 개요
+### 코드베이스의 구조와 동작 개요
 
 - 본 POC 개발의 목적
   - 3D Bin Packing 환경에서 강화학습(Maskable PPO)로 컨테이너 활용률을 최대화.
-  - 상태는 컨테이너 높이맵 + 가시 박스 크기, 행동은 [가시 박스 선택 × XY좌표]의 단일 정수 인덱스.
+  - 상태는 컨테이너 높이맵 + 가시 박스 크기, 액션은 [가시 박스 선택 × XY좌표]의 단일 정수 인덱스.
 
 - 최상위 실행 코드
   - `enhanced_optimization.py`: Phase 4 하이퍼파라미터 탐색/비교 자동화.
@@ -1990,7 +1990,7 @@ python production_final_test.py --quick     # 25k step / 30 ep
 
 - src 모듈
   - `packing_env.py`
-    - Gymnasium 환경 `PackingEnv`: 관찰공간 Dict(height_map, visible_box_sizes), 행동공간 Discrete(lx*ly*visible).
+    - Gymnasium 환경 `PackingEnv`: 관측공간 Dict(height_map, visible_box_sizes), 액션공간 Discrete(lx*ly*visible).
     - `action_masks()`: 불가능 좌표/박스 조합을 배제하는 마스크 제공.
     - `calculate_reward(...)`: 종료/중간 보상(활용률 기반).
   - `train_maskable_ppo.py`
@@ -2003,7 +2003,7 @@ python production_final_test.py --quick     # 25k step / 30 ep
   - 기타: `device_utils.py`, `train.py`, `ultimate_train_fix.py`, `vectorized_training.py`, `agents.py` 등 보조/대안 학습 루틴.
 
 - 전체 동작의 흐름
-  1) `utils.boxes_generator`로 문제 인스턴스 생성 → 2) `PackingEnv`로 Gym 환경 구성 → 3) `ActionMasker`로 불가능 행동 제거 → 4) 보상 래퍼(개선형/강화형)로 보상 쉐이핑 → 5) `MaskablePPO` 학습 → 6) 다중 에피소드 평가 및 `results/` 저장 → 7) 분석 차트/요약 리포트 생성.
+  1) `utils.boxes_generator`로 문제 인스턴스 생성 → 2) `PackingEnv`로 Gym 환경 구성 → 3) `ActionMasker`로 불가능 액션 제거 → 4) 보상 래퍼(개선형/강화형)로 보상 쉐이핑 → 5) `MaskablePPO` 학습 → 6) 다중 에피소드 평가 및 `results/` 저장 → 7) 분석 차트/요약 리포트 생성.
 
 - 실행 방법
   - 최적화 탐색:
@@ -2017,7 +2017,7 @@ python production_final_test.py --quick     # 25k step / 30 ep
 
 - 참고 논문(첨부)과의 관련성 검토
   - 참고 논문이 Transformer 정책을 사용하는 것과 달리 본 코드는 Transformer 정책 대신에 MLP 정책 + MaskablePPO를 사용하고 있다.
-  - 공통점: 높이맵 기반 상태 표현, 불가능 행동의의 마스킹으로 탐색 공간 축소, 활용률 중심의 보상 설계, 멀티 시드 다중 에피소드 평가.
+  - 공통점: 높이맵 기반 상태 표현, 불가능 액션의 마스킹으로 탐색 공간 축소, 활용률 중심의 보상 설계, 멀티 시드 다중 에피소드 평가.
   - 차이점: 논문은 Transformer 기반 정책/시퀀스 모델링을 활용하는 반면, 본 코드는 MLP `net_arch`로 정책/가치망을 구성함.
 ---  
 
@@ -2062,7 +2062,7 @@ python production_final_test.py --quick     # 25k step / 30 ep
 - **`packing_env.py`**
   - **역할**: 3D Bin Packing 문제를 위한 Gymnasium 호환 환경을 정의한다.
   - **주요 클래스**: `PackingEnv`
-  - **관찰 공간 (Observation Space)**: 
+  - **관측 공간 (Observation Space)**: 
     - `height_map`: 컨테이너의 2D 높이 맵 (Top-down view)
     - `visible_box_sizes`: 다음에 배치해야 할 박스들의 크기 정보
   - **액션 공간 (Action Space)**: `Discrete` 공간. 박스의 위치(x, y)와 회전(6가지)을 조합한 단일 정수 값.
@@ -2072,7 +2072,7 @@ python production_final_test.py --quick     # 25k step / 30 ep
 - **`packing_kernel.py`**
   - **역할**: 3D 패킹 문제의 핵심 물리 로직을 처리한다.
   - **주요 클래스**:
-    - `Box`: 3D 박스를 나타내는 객체. 위치, 크기, ID 등의 속성을 가집니다.
+    - `Box`: 3D 박스를 나타내는 객체. 위치, 크기, ID 등의 속성을 가진다.
     - `Container`: 3D 컨테이너를 나타내는 객체. 박스 배치, 충돌 검사, 높이 맵 업데이트 등의 기능을 수행한다.
   - **핵심 메서드**:
     - `Container.place_box()`: 지정된 위치에 박스를 배치하고 높이 맵을 업데이트한다.
@@ -2127,8 +2127,8 @@ height_map[x:x+w, y:y+h] += z
 - 논문 대응(Heng et al.)
   - 논문의 Action Feasibility 모듈 역할을 이 기하적 검증과 마스크가 수행.
   
-### src/packing_env.py — Gym 환경/관찰·행동·보상/마스크 노출
-- 관찰/행동
+### src/packing_env.py — Gym 환경/관측·액션·보상/마스크 노출
+- 관측/액션
   - 'observation_space = Dict({ "height_map": MultiDiscrete(X·Y), "visible_box_sizes": MultiDiscrete(K·3) })'
   - 'action_space = Discrete(X·Y·K)'
     - 디코딩: 'box_index = a // (X·Y), res = a % (X·Y), position = [res // X, res % X]'
@@ -2140,7 +2140,7 @@ height_map[x:x+w, y:y+h] += z
   - 'action_masks()' → 길이 'K·(X·Y)'의 평탄화 bool 시퀀스(내부는 박스별 그리드 결합).
 - 주의점
   - 'only_terminal_reward=True'이면 중간 스텝 보상은 0.
-  - 더미 박스가 가시 박스를 채우는 경우가 있어 관찰의 'visible_box_sizes'에 컨테이너 크기 동일 항목이 포함될 수 있음(마스크가 무효 위치를 제거).
+  - 더미 박스가 가시 박스를 채우는 경우가 있어 관측의 'visible_box_sizes'에 컨테이너 크기 동일 항목이 포함될 수 있음(마스크가 무효 위치를 제거).
 -코드 포인트
 ```147:158:src/packing_env.py
 self.observation_space = gym.spaces.Dict({...})
@@ -2160,14 +2160,14 @@ position = [res // X, res % X]
 - 'make_env(...) -> callable'
   - 'utils.boxes_generator'로 박스 생성 → 'gym.make("PackingEnv-v0")'
   - (옵션) 'ImprovedRewardWrapper' 적용
-  - 'ActionMasker(env, mask_fn)'로 정책에 유효 행동 마스크 전달
+  - 'ActionMasker(env, mask_fn)'로 정책에 유효 액션 마스크 전달
   - VecEnv에서도 안전히 쓰도록 팩토리 형태 반환
 - 'ImprovedRewardWrapper'
   - 기본 보상(환경) + 활용률 증가 보상 + 박스 배치 보상 + 효율/안정성 보너스 + 종료 보너스 + 지연·실패 페널티.
   - 매개변수: 'max_steps=1000', 가중치(예: 활용률 증가×2.0, 박스 증가×0.5 등).
 - 실무 팁
   - 마스크 함수는 항상 bool 평탄화 형태를 반환하도록 유지(일부 래퍼 체인에서 list형 반환 가능).
-  - 관찰 dict에 ‘observation’ 키가 없더라도 래퍼는 info/env 속성 기반으로 활용률을 추정(불가 시 0).
+  - 관측 dict에 ‘observation’ 키가 없더라도 래퍼는 info/env 속성 기반으로 활용률을 추정(불가 시 0).
 - 코드 포인트
 ```748:842:src/train_maskable_ppo.py
 # make_env: 생성 → (개선 보상) → ActionMasker(mask_fn) → seed
@@ -2187,7 +2187,7 @@ position = [res // X, res % X]
   - 'generate_vertices', 'cuboids_intersection', 'cuboid_fits'는 배치 검증의 기초 연산.
 
 ### 모듈 간 데이터 흐름(요약)
-- 'utils.boxes_generator' → 'PackingEnv' 초기 박스 → 'Container.action_mask'로 유효 위치 계산 → 'PackingEnv.action_masks' 평탄화 → 'ActionMasker'가 'MaskablePPO'에 전달 → 정책이 무효 행동 확률을 0 처리 → 'Container.place_box'가 'height_map' 누적 → 종료 시 SUR 계산.
+- 'utils.boxes_generator' → 'PackingEnv' 초기 박스 → 'Container.action_mask'로 유효 위치 계산 → 'PackingEnv.action_masks' 평탄화 → 'ActionMasker'가 'MaskablePPO'에 전달 → 정책이 무효인 액션 확률을 0 처리 → 'Container.place_box'가 'height_map' 누적 → 종료 시 SUR 계산.
 
 ### 논문(Heng et al.)과의 정합성
 - **SUR**: 동일 공식으로 측정(placed_volume/container_volume).
@@ -2199,7 +2199,7 @@ position = [res // X, res % X]
 
 - 주요 포인트 요약
   - 'packing_kernel'이 Feasibility의 핵심(지지율·충돌·경계 검증 + 마스크 생성).
-  - 'packing_env'가 관찰/행동/보상/마스크를 Gym 인터페이스로 노출.
+  - 'packing_env'가 관측/액션/보상/마스크를 Gym 인터페이스로 노출.
   - 'train_maskable_ppo.make_env'가 보상 쉐이핑과 마스킹을 일관 조립.
   - 'utils.boxes_generator'가 컨테이너 부피 보존 분할로 박스 세트를 생성해 SUR 지표와 잘 맞물림.
 
@@ -2284,7 +2284,7 @@ graph TD
       │ feeds
       ▼
 [환경 생성 gym.make("PackingEnv-v0")]
-  - 초기 관찰 obs: {"height_map", "visible_box_sizes"}
+  - 초기 관측 obs: {"height_map", "visible_box_sizes"}
       │
       ├─▶ [ImprovedRewardWrapper] (보상 shaping)
       │
@@ -2300,7 +2300,7 @@ graph TD
 [학습 루프 model.learn(total_timesteps)]
   (반복)
    ┌──────────────────────────────────────────────────────────┐
-   │ 1) 관찰 obs_t 수집                                      │
+   │ 1) 관측 obs_t 수집                                      │
    │ 2) get_action_masks(env) → mask_t                        │
    │ 3) 정책 π(a|s,mask) → action_t                           │
    │ 4) env.step(action_t) → (obs_{t+1}, reward_t, done, ...) │
@@ -2310,7 +2310,7 @@ graph TD
       │
       ▼
 [평가 loop (deterministic/with masks)]
-  - 동일 관찰/마스킹/정책 추론/스텝
+  - 동일 관측/마스킹/정책 추론/스텝
   - 에피소드 별 보상/활용률 집계
       │
       ▼
@@ -2338,7 +2338,8 @@ graph TD
   - **입력**: `container_size`, `box_sizes`, `num_visible_boxes`
   - **처리**:
     - `gym.make("PackingEnv-v0", ...)`로 `PackingEnv` 인스턴스 생성
-    - `ImprovedRewardWrapper` 적용: 부분 적재, 높이 평탄화, 충돌 회피 등 보상 신호를 단계별로 보강
+    - `ImprovedRewardWrapper` 적용: 부분 적재, 높이 평탄화, 충돌 회피 등 보상 신호를 단계별로 보강 -> 보상 셰이핑(Reward Shaping)
+    - 보상 셰이핑(Reward Shaping)의 개념: 에이전트가 더 빠르고 효율적으로 학습하도록 돕기 위해 기존의 보상(reward) 시스템에 추가적인 보상을 설계하여 제공하는 기술. 특히, 최종 목표 달성까지 오랜 시간이 걸리거나, 목표를 달성했을 때만 보상이 주어지는 희소한(sparse) 보상 환경에서 학습 속도를 높이는 데 효과적임
     - `ActionMasker(env, get_action_masks)` 적용: `get_action_masks`가 불가능 액션을 필터링
     - `Monitor`, `DummyVecEnv` 적용: 스텝·리셋 로깅, 벡터화 학습 준비
   - **주요 코드**: `src/packing_env.py`, `src/train_maskable_ppo.py`의 `ImprovedRewardWrapper`, `get_action_masks`
@@ -2374,13 +2375,13 @@ graph TD
   - **처리**: 각 trial이 위의 “설정→데이터→환경→학습→평가” 파이프라인을 1회 수행
   - **출력**: 최적 파라미터, 성능 비교 리포트
 
-### 학습 스텝 내부 데이터 흐름(한눈에)
+### 학습 스텝 내부의 데이터 흐름 일람
 
-- **관찰**: `obs = {"height_map": HxW float, "visible_box_sizes": Kx3 int}`
+- **관측**: `obs = {"height_map": HxW float, "visible_box_sizes": Kx3 int}`
 - **마스크**: `mask = get_action_masks(env) → shape = [action_space_n] (bool)`
-- **정책 전개**: `action = π(obs, mask)` → 무효 액션 확률 0 처리
+- **정책 전개**: `action = π(obs, mask)` → 무효인 액션의 확률 0 처리
 - **환경 전개**: `next_obs, reward_raw, done, info = env.step(action)`
-- **보상 보강**: `reward = ImprovedRewardWrapper(reward_raw, state, action, info)`
+- **보상 셰이핑**: `reward = ImprovedRewardWrapper(reward_raw, state, action, info)`
 - **로깅**: `Monitor`가 `ep_rew`, `ep_len`, `timestep` 기록
 
 ### 산출물 및 경로
@@ -2413,7 +2414,7 @@ python production_final_test.py --num-boxes 200 --timesteps 150000 --n-steps 409
 
 - GIF/시각화 시 `Monitor` 래퍼로 인한 속성 접근 오류는 이미 `env.unwrapped` 경로로 해결되어 있다.
 
-- 999-step hang 이슈는 `ultimate_train_fix.py`로 해결된 흐름을 그대로 따릅니다.
+- 999-step hang 이슈는 `ultimate_train_fix.py`로 해결된 흐름을 그대로 따른다.
 
 - HPO를 돌릴 경우 같은 파이프라인이 trial마다 반복되며, 최적 파라미터가 `results/`에 누적 기록된다.
 
@@ -2429,48 +2430,47 @@ python production_final_test.py --num-boxes 200 --timesteps 150000 --n-steps 409
 
 - 클라우드/CPU-only 모드에서는 `cpu_only_optimal_test.py`의 디바이스 강제 설정으로 동일 파이프라인을 CPU 상에서 재생한다.
 
-- 전체 플로우는 모듈화되어 있어, 학습/평가/최적화 어느 루트로 시작하든 동일한 관찰→마스킹→정책→스텝→보상→로깅 데이터 흐름을 공유한다.
+- 전체 플로우는 모듈화되어 있어, 학습/평가/최적화 어느 루트로 시작하든 동일한 관측→마스킹→정책→스텝→보상→로깅 데이터 흐름을 공유한다.
 
-- Optuna/W&B를 붙일 경우에도 다이어그램의 “설정→데이터→환경→학습→평가→지표” 체인이 trial 단위로 반복될 뿐, 추가적인 데이터 경로 변화는 없습니다.
+- Optuna/W&B를 붙일 경우에도 다이어그램의 “설정→데이터→환경→학습→평가→지표” 체인이 trial 단위로 반복될 뿐, 추가적인 데이터 경로 변화는 없다.
 
 - 결과 해석은 `RESULTS_INTERPRETATION_GUIDE.md`의 지표 정의에 기반한다.
 
 - 논문식 200박스 비교 시에도 SUR 유사 지표(활용률)와 `combined_score`를 병행 보고하면 파이프라인 일관성을 유지한다.
 
-- GIF 생성 파이프라인은 학습/평가 루프 바깥에서 `env.unwrapped.container`/`packed_boxes`를 읽어 프레임을 뽑는 별도 흐름이며, 학습 데이터 경로에는 간섭하지 않습니다.
+- GIF 생성 파이프라인은 학습/평가 루프 바깥에서 `env.unwrapped.container`/`packed_boxes`를 읽어 프레임을 뽑는 별도 흐름이며, 학습 데이터 경로에는 간섭하지 않는다.
 
 - 끝으로, `ultimate_train_fix.py` 경로를 기준으로 실행하면 콜백/평가 타이밍이 안정화되어 999-step hang 없이 위 파이프라인을 그대로 실행한다.
 
-- 대규모(200박스)에서 병목이 보이면 `get_action_masks`와 보상 계산을 먼저 점검해 주세요. 동일 파이프라인에서 가장 호출 빈도가 높은 부분이다.
+- 대규모(200박스)에서 병목이 보이면 `get_action_masks`와 보상 계산을 먼저 점검한다. 동일 파이프라인에서 가장 호출 빈도가 높은 부분이다.
 
 - 필요 시 실행 로그(`logs/*.csv`)와 모델 스냅샷(`models/*.zip`)을 통해 같은 파이프라인 상태를 재현할 수 있다.
 
-- 위 다이어그램을 기준으로, 특정 단계에 대한 추가 세부 흐름(예: 보상 항목별 기여, 마스크 구성 규칙)을 더 풀어드릴 수 있다. 원하는 지점을 알려주세요.
+- 위 다이어그램을 기준으로, 특정 단계에 대한 추가 세부 흐름(예: 보상 항목별 기여, 마스크 구성 규칙)을 더 풀어드릴 수 있다. 원하는 지점을 알려달라.
 
 - 핵심: 파이프라인은 단순·일관하며, 박스 개수 확장/하이퍼파라미터/HPO 여부와 관계없이 동일한 데이터 흐름을 유지한다.
 
 - 안정성 측면에서는 `Monitor`/`unwrapped` 접근, 함수 순서 정리, `activation_fn=nn.ReLU` 등 기존 수정 사항이 이미 반영되어 있다.
 
-- 따라서 현재 실험과 논문형 비교 실험 모두 위 파이프라인으로 안전하게 실행 가능한다.
+- 따라서 현재 실험과 논문형 비교 실험 모두 위 파이프라인으로 안전하게 실행 가능하다.
 
-- 마지막으로, 200박스 실험 시 `results/`에 저장되는 JSON과 요약 텍스트에서 `combined_score`의 추이를 관찰하면, 동일 파이프라인을 기반으로 한 설정간 공정 비교가 가능한다.
+- 마지막으로, 200박스 실험 시 `results/`에 저장되는 JSON과 요약 텍스트에서 `combined_score`의 추이를 관측하면, 동일 파이프라인을 기반으로 한 설정간 공정 비교가 가능하다.
 
-- 필요하면 도식 이미지를 별도로 내보내 드리겠습니다.
+- 필요하면 도식 이미지를 별도로 내보내 드리겠다.
 
 - 문의 주신 ‘4. 실행 파이프라인 및 데이터 흐름’에 맞춰, 다이어그램과 단계별 대응을 위와 같이 정리했습니다.
 
-- 다음 단계로, 현재 사용 중인 스크립트(`production_final_test.py` 또는 `enhanced_optimization.py`)에서 `num_boxes`만 늘려 위 파이프라인을 그대로 실행하시길 권한다.
+- 다음 단계로, 현재 사용 중인 스크립트(`production_final_test.py` 또는 `enhanced_optimization.py`)에서 `num_boxes`만 늘려 위 파이프라인을 그대로 실행하길 권한다.
 
 - 추가로 HPO를 붙일지 여부는 리소스/시간 고려 후 결정하면 된다.
 
 - 최적화나 디버깅용 상세 로그가 필요하면 `gradual_expansion_debug.py`의 로깅 수준을 참조해 동일 파이프라인에 삽입하세요.
 
-- 더 구체적인 내부 데이터 형태(텐서 크기, 마스크 비트맵 예시)가 필요하시면 말씀해 주세요.
-
+- 더 구체적인 내부 데이터 형태(텐서 크기, 마스크 비트맵 예시)가 필요하시면 말씀해 달라.
 
 - 주요 수정/추가 없이 설명만 제공
 - 실행 파이프라인 다이어그램과 각 단계의 입력/처리/출력, 관련 파일/함수 명시
-- 학습 스텝 내부 데이터 흐름과 산출물 경로 정리
+- 학습 스텝 내부의의 데이터 흐름과 산출물 경로 정리
 - 200박스 확장 시 변경점만 별도 강조 (파이프라인 동일)
 - 실행 예시 커맨드 함께 제공
 
@@ -2491,7 +2491,7 @@ python production_final_test.py --num-boxes 200 --timesteps 150000 --n-steps 409
       │ feeds
       ▼
 [환경 생성 gym.make("PackingEnv-v0")]
-  - 초기 관찰 obs: {"height_map", "visible_box_sizes"}
+  - 초기 관측 obs: {"height_map", "visible_box_sizes"}
       │
       ├─▶ [ImprovedRewardWrapper] (보상 shaping)
       │
@@ -2507,7 +2507,7 @@ python production_final_test.py --num-boxes 200 --timesteps 150000 --n-steps 409
 [학습 루프 model.learn(total_timesteps)]
   (반복)
    ┌──────────────────────────────────────────────────────────┐
-   │ 1) 관찰 obs_t 수집                                      │
+   │ 1) 관측 obs_t 수집                                      │
    │ 2) get_action_masks(env) → mask_t                        │
    │ 3) 정책 π(a|s,mask) → action_t                           │
    │ 4) env.step(action_t) → (obs_{t+1}, reward_t, done, ...) │
@@ -2517,7 +2517,7 @@ python production_final_test.py --num-boxes 200 --timesteps 150000 --n-steps 409
       │
       ▼
 [평가 loop (deterministic/with masks)]
-  - 동일 관찰/마스킹/정책 추론/스텝
+  - 동일 관측/마스킹/정책 추론/스텝
   - 에피소드 별 보상/활용률 집계
       │
       ▼
@@ -2537,7 +2537,7 @@ python production_final_test.py --num-boxes 64 --timesteps 25000 --n-steps 2048 
 python production_final_test.py --num-boxes 200 --timesteps 150000 --n-steps 4096 --net-arch 512,512,256
 ```
 
-## 5. 핵심 데이터 구조 및 수식
+## 5. 핵심 데이터 구조 및 관련 수식
 
 | 항목 | 정의 | 논문 수식 대응 |
 | :--- | :--- | :--- |
@@ -2551,13 +2551,13 @@ python production_final_test.py --num-boxes 200 --timesteps 150000 --n-steps 409
 @RL-3DbinPacking/ 위 답변의 '5. 핵심 데이터 구조 및 수식' 부분에 대해 상세한 설명을 추가해줘
 ---
 **Cursor**
-다음 단계로, 코드에서 실제 `관찰/행동/마스크/보상` 정의를 정확히 확인해 세부 수식과 데이터 구조를 정리하겠습니다. 관련 구현을 한꺼번에 찾아봅니다.
+다음 단계로, 코드에서 실제 `관측/액션/마스크/보상` 정의를 정확히 확인해 세부 수식과 데이터 구조를 정리하겠다. 관련 구현을 한꺼번에 찾아본다.
 
-지금 핵심 정의(관찰/행동/마스크/보상)를 코드에서 정확히 확인하기 위해 관련 파일들을 한꺼번에 열람하겠습니다.
+지금 핵심 정의(관측/액션/마스크/보상)를 코드에서 정확히 확인하기 위해 관련 파일들을 한꺼번에 열람하겠다.
 
 간단한 진행 상황: 핵심 구조를 정확히 설명하기 위해 `src/packing_env.py`, `src/packing_kernel.py`, `src/train_maskable_ppo.py`, `src/ultimate_train_fix.py`, `src/utils.py`를 확인했습니다. 아래에 코드 라인 인용과 함께 데이터 구조와 수식을 정리한다.
 
-### 관찰(Observation) 구조
+### 관측(Observation) 공간
 
 - 형태
   - height_map: \(H \in \mathbb{N}^{X \times Y}\), 컨테이너 상면 높이맵. 학습 입출력 시 1차원으로 평탄화되어 길이 \(X \cdot Y\)의 벡터.
@@ -2598,7 +2598,7 @@ box_repr[:] = self.container.size + [1, 1, 1]
 box_repr = np.reshape(box_repr, newshape=(num_visible_boxes * 3,))
 ```
 
-- 가시 박스가 모자랄 때 dummy 박스가 채워져 관찰에 들어갑니다.
+- 가시 박스가 모자랄 때 dummy 박스가 채워져 관측에 들어간다.
 ```386:396:src/packing_env.py
 dummy_box_size = self.container.size
 num_dummy_boxes = self.num_visible_boxes - len(self.unpacked_visible_boxes)
@@ -2606,14 +2606,14 @@ box_size_list = [box.size for box in self.unpacked_visible_boxes] + [dummy_box_s
 self.state["visible_box_sizes"] = np.reshape(box_size_list, (self.num_visible_boxes * 3,))
 ```
 
-### 행동(Action) 공간과 인코딩
+### 액션(Action) 공간과 인코딩
 
 - 크기: `Discrete(X*Y*K)`
 - 인덱스 → 의미 매핑
   - \(b = \left\lfloor \frac{a}{X\cdot Y} \right\rfloor\): 가시 박스 인덱스
   - \(r = a \bmod (X\cdot Y)\)
   - 코드 구현 기준 좌표: \(x = \left\lfloor \frac{r}{X} \right\rfloor,\; y = r \bmod X\)
-    - 주석 설명과 `X/Y` 축 사용이 다소 상이한다. 아래는 “현재 코드” 기준이다.
+    - 주석 설명과 `X/Y` 축 사용이 다소 상이하다. 아래는 “현재 코드” 기준이다.
 ```185:206:src/packing_env.py
 box_index = action // (self.container.size[0] * self.container.size[1])
 res = action % (self.container.size[0] * self.container.size[1])
@@ -2640,7 +2640,7 @@ for index in range(len(self.unpacked_visible_boxes)):
 return [x == 1 for x in act_mask.flatten()]
 ```
 
-- 유효 위치 판정 수식 (`check_valid_box_placement` 요약)
+- 유효 위치의 판정 수식 (`check_valid_box_placement` 함수의 동작 요약)
   1) 컨테이너 내부 포함성: 박스 바닥 4점이 경계 내
   2) 바닥 4점의 높이 일치: \(H[v0]=H[v1]=H[v2]=H[v3]\)
   3) 바닥 면 전체의 최대 높이와 코너 높이 일치: \(\max(H[\text{면}]) = \text{lev}\)
@@ -2669,7 +2669,7 @@ elif reward_type == "interm_step":
     reward = packed_volume / ((max_x-min_x)*(max_y-min_y)*(max_z-min_z))
 ```
 
-- ImprovedRewardWrapper(선택적)로 보상 보강
+- ImprovedRewardWrapper(선택적)로 보상 셰이핑
   - 활용률 개선 보상: \(\Delta u > 0 \Rightarrow +2.0 \cdot \Delta u\)
   - 박스 배치 보상: \(\Delta n > 0 \Rightarrow +0.5 \cdot \Delta n\)
   - 효율 보너스: \(+0.1 \cdot (1 - \frac{\text{step}}{\text{max\_steps}})\)
@@ -2714,7 +2714,7 @@ self.height_map[
 ] += box.size[2]
 ```
 
-### 박스 생성(boxes_generator) 개요
+### 박스 생성(boxes_generator) 동작의 개요
 
 - 컨테이너 크기를 시작으로, 부피/중심치 편향 가중으로 축을 선택하여 이분 분할을 반복해 총 `num_items` 크기 집합 생성. 부피 보존.  
   결과는 컨테이너에 “이론상” 꽉 채울 수 있는 조합을 만들 확률이 높음.
@@ -2731,14 +2731,14 @@ self.height_map[
 - `Box`
   - `size=[w,h,d]`, `position=[x,y,z] or [-1,-1,-1]`, `volume=w·h·d`
 - `PackingEnv`
-  - 관찰: `{"height_map": flat(X·Y), "visible_box_sizes": flat(K·3)}`
-  - 행동: `Discrete(X·Y·K)`; 인덱스→좌표 매핑은 위 수식(코드 기준)
+  - 관측: `{"height_map": flat(X·Y), "visible_box_sizes": flat(K·3)}`
+  - 액션: `Discrete(X·Y·K)`; 인덱스→좌표 매핑은 위 수식(코드 기준)
   - 마스크: 길이 `K·X·Y` 불리언
   - 보상: 종료/중간식 + (옵션) 개선 보상 래퍼
 
 간단 요약
-- 관찰은 높이맵(X·Y)과 가시 박스(K·3)를 평탄화한 `Dict` 구조.
-- 행동은 `Discrete(X·Y·K)`로, 인덱스를 박스 선택과 (x,y) 위치로 복원.
+- 관측은 높이맵(X·Y)과 가시 박스(K·3)를 평탄화한 `Dict` 구조.
+- 액션은 `Discrete(X·Y·K)`로, 인덱스를 박스 선택과 (x,y) 위치로 복원.
 - 마스크는 박스별 유효 좌표를 결합해 길이 `K·X·Y`의 불리언 벡터로 제공.
 - 보상은 기본(종료/중간) 공식에 더해 개선 래퍼가 단계별 가중 보상/페널티를 추가.
 - 최적화 목적은 `0.3*보상 + 0.7*(활용률*100)`의 결합 점수.
@@ -2851,7 +2851,7 @@ self.height_map[
 # split point center-biased → two boxes → 반복
 ```
 
-## 6. 주요 파일 및 디렉토리 구조
+## 6. 디렉토리 및 파일의 구조
 
 ```
 RL-3DbinPacking/
@@ -2870,7 +2870,7 @@ RL-3DbinPacking/
     └── production_optimal_*.zip
 ```
 
-이 문서는 두 실행 스크립트와 직접적으로 연관된 파일만을 대상으로, 논문의 이론적 배경과 코드의 실제 구현을 연결하여 작성되었습니다.
+이 문서는 두 실행 스크립트와 직접적으로 연관된 파일만을 대상으로, 논문의 이론적 배경과 코드의 실제 구현을 연결하여 작성되었다.
 
 ```plaintext
 graph TD
@@ -2913,7 +2913,7 @@ RL-3DbinPacking/
 ```
 ---
 **User**
-@RL-3DbinPacking/ 위 답변의 '6. 주요 파일 및 디렉토리 구조' 부분에 대해 상세한 설명을 추가해줘
+@RL-3DbinPacking/ 위 답변의 '6. 주요 디렉토리 및 파일 구조' 부분에 대해 상세한 설명을 추가해줘
 ---
 **Cursor**
 
@@ -2922,8 +2922,8 @@ RL-3DbinPacking/
 ### 디렉토리 개요
 - `src/`: 환경, 커널, 학습 유틸의 코어 코드
 - 루트(프로젝트 최상위): 학습/최적화/검증 스크립트, 실험 자동화, 결과물 저장 경로 생성
-- `results/`, `logs/`, `models/`, `gifs/`: 산출물 디렉토리
-- `docs/`: 대화/가이드/논문 등 문서
+- `results/`, `logs/`, `models/`, `gifs/`: 산출물 저장
+- `docs/`: 가이드/논문 등의 문서
 - `tests/`, 개별 디버그 스크립트: 문제 재현·단위 검증
 
 ### 핵심 모듈 (`src/`)
@@ -2932,7 +2932,7 @@ RL-3DbinPacking/
   - `Container`: `height_map`, `action_mask`, `check_valid_box_placement`, `place_box`
   - 수식: 유효 위치 검증(경계/수평/지지율/충돌/완전적합), 높이맵 갱신
 - `src/packing_env.py`
-  - `PackingEnv`(Gymnasium): 관찰(`height_map`, `visible_box_sizes`), 행동(`Discrete(X*Y*K)`), 보상(종료/중간)
+  - `PackingEnv`(Gymnasium): 관측(`height_map`, `visible_box_sizes`), 액션(`Discrete(X*Y*K)`), 보상(종료/중간)
   - `action_to_position`, `position_to_action`, `action_masks`(박스별 마스크 결합)
 - `src/train_maskable_ppo.py`
   - `make_env`: 박스 생성→`PackingEnv`→`ImprovedRewardWrapper`(옵션)→`ActionMasker` 적용
@@ -2995,8 +2995,8 @@ RL-3DbinPacking/
 ### 실행 포인트(예)
 - 안전 학습(999해결):  
   `python src/ultimate_train_fix.py --timesteps 15000 --eval-freq 2000 --num-boxes 16`
-- 프로덕션 검증:  
-  `python production_final_test.py --num-boxes 32 --timesteps 50000`
+- 프로덕션 코드의 검증:  
+  `python production_final_test.py --num-boxes 32 --timesteps 50000
 - 최적화(Optuna):  
   `python src/ultimate_train_fix.py --optimize --optimization-method optuna --n-trials 30`
 
@@ -3004,4 +3004,4 @@ RL-3DbinPacking/
   - `src/`는 환경/커널/보상/마스킹의 핵심.
   - 학습은 `ultimate_train_fix.py` 중심(콜백/커리큘럼/HPO/999-fix).
   - 최적화·검증·디버깅은 루트의 전용 스크립트로 분리.
-  - 결과는 `models/`, `logs/`, `results/`, `gifs/`에 일관 저장.
+  - 결과는 일률적으로 `models/`, `logs/`, `results/`, `gifs/`에 저장.

@@ -539,7 +539,7 @@ class EnhancedOptimizer:
             return {}
 
     def create_performance_analysis(self, results_file: str):
-        """결과 JSON을 바탕으로 종합 성능 차트 생성 및 저장."""
+        """결과 JSON을 바탕으로 종합 성능 차트를 생성 및 저장함."""
         try:
             with open(results_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)

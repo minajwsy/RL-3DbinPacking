@@ -4,8 +4,8 @@
 
 개요
 - Phase 4에서 도출된 최적 하이퍼파라미터(`PRODUCTION_OPTIMAL`)로 학습/평가를 수행하고,
-  목표 점수(20.591) 대비 재현성과 안정성을 검증합니다.
-- 평가 후, train_15_boxes.gif와 동일한 사양(1200x1200, 11프레임, 지연시간/루프 설정)의 데모 GIF를 생성합니다.
+  목표 점수(20.591) 대비 재현성과 안정성을 검증한다.
+- 평가 후, train_15_boxes.gif와 동일한 사양(1200x1200, 11프레임, 지연시간/루프 설정)의 데모 GIF를 생성한다.
 
 핵심 흐름
 1) 환경 생성(create_production_env)
@@ -220,7 +220,7 @@ def _render_env_frame_3d(env, step_num=0, fig_size_px=(1200, 1200)):
     """현재 환경 상태를 1200x1200 PNG 이미지로 렌더링 후 PIL Image 반환
 
     - matplotlib 3D로 컨테이너 경계/배치 박스를 그립니다.
-    - 이미지 크기는 train_15_boxes.gif와 동일(1200x1200)하게 고정합니다.
+    - 이미지 크기는 train_15_boxes.gif와 동일(1200x1200)하게 고정한다.
     """
     try:
         import matplotlib
@@ -360,8 +360,8 @@ def save_gif_like_train15(frames, out_path):
 def generate_production_demo_gif(model, container_size=[10,10,10], num_boxes=12, max_steps=80, out_name='production_final_demo.gif'):
     """여러 시도 중 최다 배치 결과를 사용해 train_15_boxes.gif 포맷으로 GIF 생성
 
-    - 다양한 시드(seeds)로 시연을 수행하고, 배치된 박스 수가 가장 많은 시도의 프레임을 선택해 GIF로 저장합니다.
-    - 모델 예측을 기본으로 하되, 정체되면 마스크 기반 유효 액션에서 랜덤 시도로 탈출을 유도합니다.
+    - 다양한 시드(seeds)로 시연을 수행하고, 배치된 박스 수가 가장 많은 시도의 프레임을 선택해 GIF로 저장한다.
+    - 모델 예측을 기본으로 하되, 정체되면 마스크 기반 유효 액션에서 랜덤 시도로 탈출을 유도한다.
     """
     try:
         from sb3_contrib.common.maskable.utils import get_action_masks
@@ -614,8 +614,8 @@ def main():
     if success:
         print("🎉 프로덕션 최종 테스트 성공!")
     else:
-        print("📈 성능 개선이 필요합니다.")
-
+        print("📈 성능 개선이 필요함.")
+하하
 
 if __name__ == "__main__":
     main()
