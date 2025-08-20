@@ -1978,11 +1978,11 @@ python production_final_test.py --quick     # 25k step / 30 ep
   
 ### 코드베이스 구조와 동작 개요
 
-- 핵심 목적
+- 본 POC 개발의 목적
   - 3D Bin Packing 환경에서 강화학습(Maskable PPO)로 컨테이너 활용률을 최대화.
   - 상태는 컨테이너 높이맵 + 가시 박스 크기, 행동은 [가시 박스 선택 × XY좌표]의 단일 정수 인덱스.
 
-- 최상위
+- 최상위 실행 코드
   - `enhanced_optimization.py`: Phase 4 하이퍼파라미터 탐색/비교 자동화.
   - `production_final_test.py`: 최적 설정(Phase 4 결과)으로 학습→평가→결과저장.
   - `README.md`: 문제정의, 설치, 환경 소개.
@@ -2002,7 +2002,7 @@ python production_final_test.py --quick     # 25k step / 30 ep
     - `Container`, `Box` 등 엔진 레벨 로직(배치, 높이맵, 유효성 검사 등).
   - 기타: `device_utils.py`, `train.py`, `ultimate_train_fix.py`, `vectorized_training.py`, `agents.py` 등 보조/대안 학습 루틴.
 
-- 전체 동작 흐름
+- 전체 동작의 흐름
   1) `utils.boxes_generator`로 문제 인스턴스 생성 → 2) `PackingEnv`로 Gym 환경 구성 → 3) `ActionMasker`로 불가능 행동 제거 → 4) 보상 래퍼(개선형/강화형)로 보상 쉐이핑 → 5) `MaskablePPO` 학습 → 6) 다중 에피소드 평가 및 `results/` 저장 → 7) 분석 차트/요약 리포트 생성.
 
 - 실행 방법
@@ -2015,10 +2015,10 @@ python production_final_test.py --quick     # 25k step / 30 ep
     - 빠른: `python production_final_test_annotated.py --quick`
   - 루트에서 실행해야 `sys.path.append('src')`가 올바르게 동작합니다.
 
-- 첨부 논문과의 연결
-  - 본 코드는 Transformer 정책 대신 MLP 정책 + MaskablePPO를 사용하지만,
-  - 공통점: 높이맵 기반 상태표현, 불가능행동 마스킹으로 탐색 공간 축소, 활용률 중심 보상 설계, 멀티 시드 다중 에피소드 평가.
-  - 차이점: 논문은 Transformer 기반 정책/시퀀스 모델링을 활용하는 반면, 본 코드는 MLP `net_arch`로 정책/가치망을 구성.
+- 참고 논문(첨부)과의 관련성 검토
+  - 참고 논문이 Transformer 정책을 사용하는 것과 달리 본 코드는 Transformer 정책 대신에 MLP 정책 + MaskablePPO를 사용하고 있다.
+  - 공통점: 높이맵 기반 상태 표현, 불가능 행동의의 마스킹으로 탐색 공간 축소, 활용률 중심의 보상 설계, 멀티 시드 다중 에피소드 평가.
+  - 차이점: 논문은 Transformer 기반 정책/시퀀스 모델링을 활용하는 반면, 본 코드는 MLP `net_arch`로 정책/가치망을 구성함.
 ---  
 
 | 구분 | Heng et al. (논문) | 본 코드베이스 |
