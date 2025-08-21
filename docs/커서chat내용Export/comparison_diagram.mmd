@@ -1,0 +1,36 @@
+graph TB
+    A[3D Bin Packing 문제] --> B[논문: Transformer 기반 DRL]
+    A --> C[코드베이스: MaskablePPO]
+    
+    B --> B1[순차적 의사결정<br/>Self-Attention]
+    B --> B2[박스 관계 모델링<br/>시퀀스 처리]
+    B --> B3[Transformer Encoder<br/>복잡한 패턴 학습]
+    
+    C --> C1[높이맵 기반 상태<br/>Dict Space]
+    C --> C2[행동 마스킹<br/>불가능 행동 배제]
+    C --> C3[MLP + PPO<br/>단순하고 실용적]
+    
+    B1 --> D[상태 표현]
+    B2 --> D
+    C1 --> D
+    C2 --> D
+    
+    B3 --> E[학습 알고리즘]
+    C3 --> E
+    
+    D --> F[최종 성능]
+    E --> F
+    
+    style B fill:#ffcccc
+    style C fill:#ccffcc
+    style D fill:#ffffcc
+    style E fill:#ccccff
+    style F fill:#ffccff
+    
+    subgraph "구체적 구현 차이"
+        G[행동 마스킹] --> G1[논문: Attention 기반 소프트 마스킹]
+        G --> G2[코드: 명시적 불가능 행동 차단]
+        
+        H[보상 설계] --> H1[논문: 복잡한 다중 목표 보상]
+        H --> H2[코드: 활용률 기반 단순 보상]
+    end
