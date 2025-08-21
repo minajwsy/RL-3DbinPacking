@@ -2920,7 +2920,7 @@ RL-3DbinPacking/
 간단 상태: `src/` 핵심 모듈과 학습/최적화/검증/디버깅 스크립트 전반을 확인해, 파일-기능 대응으로 정리했습니다.
 
 ### 디렉토리 개요
-- `src/`: 환경, 커널, 학습 유틸의 코어 코드
+- `src/`: 환경, 커널, 학습 유틸의 핵심 코드
 - 루트(프로젝트 최상위): 학습/최적화/검증 스크립트, 실험 자동화, 결과물 저장 경로 생성
 - `results/`, `logs/`, `models/`, `gifs/`: 산출물 저장
 - `docs/`: 가이드/논문 등의 문서
@@ -2954,8 +2954,6 @@ RL-3DbinPacking/
 ### 학습/최적화/검증 스크립트(루트)
 - 학습 실행
   - `production_final_test.py`: 프로덕션용 고정 파라미터 학습/평가
-  - `ultimate_train_cloud.py`: 경량 클라우드용
-  - `improved_train.py`, `quick_train.py`, `lightweight_train.py`: 간단 실행/테스트
 - 고급 최적화
   - `enhanced_optimization.py`: 전략별 설정(예: `stability_balanced`)로 다중 실험 배치
   - `advanced_restoration.py`: 단계적 복원→확장→최종 최적화 파이프라인

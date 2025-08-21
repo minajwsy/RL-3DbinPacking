@@ -59,9 +59,9 @@ except ImportError as e:
 "
 
 echo "=== narwhals 에러 해결 완료 ==="
-echo "이제 다음 명령어로 학습을 시작 :"
-echo "python -m src/ultimate_train_fix --timesteps 20000 --eval-freq 1500 --container-size 10 10 10 --num-boxes 32 --curriculum-learning --improved-rewards"
-
+echo "이제 다음 명령어로 최적화 및 학습을 시작 :"
+echo "python enhanced_optimization.py --focus=all --timesteps=50000"
+echo "python production_final_test.py"
 
 ## Hyperparameter 최적화 도구인 Optuna(및 관련 W&B)의 설치 ##
 uv pip install "optuna>=3.4.0,<4.0.0"
