@@ -2156,7 +2156,61 @@ graph TD
 
 ### **4.1 전체 실행 파이프라인 다이어그램**
 
-#### 3D Bin Packing 전체 실행 파이프라인
+```
+[CLI/스크립트 인자]
+      │  (예: num_boxes, timesteps, seed, net_arch ...)
+      ▼
+[설정/초기화]
+  - 환경 등록(gym.register)
+  - RNG/시드 설정
+  - 로깅 디렉토리 생성
+      │
+      │ uses
+      ▼
+[데이터 생성]
+  - utils.boxes_generator → box_sizes
+      │
+      │ feeds
+      ▼
+[환경 생성 gym.make("PackingEnv-v0")]
+  - 초기 관측 obs: {"height_map", "visible_box_sizes"}
+      │
+      ├─▶ [ImprovedRewardWrapper] (보상 shaping)
+      │
+      ├─▶ [ActionMasker(get_action_masks)] (유효/무효 액션 마스킹)
+      │
+      └─▶ [Monitor/DummyVecEnv] (에피소드/타임스텝 로깅, 벡터화)
+      │
+      ▼
+[에이전트/정책 생성]
+  - MaskablePPO("MultiInputPolicy", policy_kwargs=net_arch/activation_fn, ...)
+      │
+      ▼
+[학습 루프 model.learn(total_timesteps)]
+  (반복)
+   ┌──────────────────────────────────────────────────────────┐
+   │ 1) 관측 obs_t 수집                                        │
+   │ 2) get_action_masks(env) → mask_t                        │
+   │ 3) 정책 π(a|s,mask) → action_t                           │
+   │ 4) env.step(action_t) → (obs_{t+1}, reward_t, done, ...) │
+   │ 5) ImprovedRewardWrapper가 reward_t를 shaping            │
+   │ 6) Monitor가 로그 기록                                    │
+   └──────────────────────────────────────────────────────────┘
+      │
+      ▼
+[평가 loop (deterministic/with masks)]
+  - 동일 관측/마스킹/정책 추론/스텝
+  - 에피소드 별 보상/활용률 집계
+      │
+      ▼
+[지표 산출/저장]
+  - mean_reward, mean_utilization, success_rate
+  - combined_score = 0.3*mean_reward + 0.7*(mean_utilization*100)
+  - logs/, models/, results/에 저장
+      │
+      └─(선택) Optuna/W&B가 반복 호출해 탐색 및 최적화
+```
+# 3D Bin Packing 전체 실행 파이프라인
 
 ```mermaid
 flowchart TD
@@ -2876,10 +2930,8 @@ RL-3DbinPacking/
   - 결과는 일률적으로 `models/`, `logs/`, `results/`, `gifs/`에 저장.
   
 ## 7. 두 케이스(논문 vs. 코드베이스)의 비교
-
-논문과 본 코드베이스의 두 시나리오를 비교해 보면 다음과 같다.
-
 ### **7.1 박스 갯수‧난이도 차이**
+논문과 본 코드베이스의 두 시나리오를 비교해 보면 다음과 같다.
 
 | 구분 | 논문 (Transformer) | 코드베이스 (MLP + MaskablePPO) |
 |------|------------------|------------------------------|
@@ -2949,13 +3001,13 @@ RL-3DbinPacking/
 
 가장 큰 차이점은 **정책 모델(Policy Model)**에 있다.
 
-| 구분 | Heng et al. (논문) | 코드베이스 |
+| 구분 | Heng et al. (논문) | 본 코드베이스 |
 | :--- | :--- | :--- |
 | **핵심 모델** | **Transformer** (Encoder-Decoder) | **MLP** + **MaskablePPO** |
 | **강점** | 복잡한 아이템 간의 관계 학습, 높은 표현력 | 빠른 학습 속도, 가벼운 모델, 효율적인 최적화 |
 | **전략** | 모델의 **표현력(Expressiveness)**으로 문제 해결 | **정교한 엔지니어링**으로 모델의 한계 극복 |
 
-논문이 Transformer라는 강력한 모델을 통해 성능의 상한선을 제시했다면, 본 코드베이스는 **MLP라는 경량 모델**을 채택하고 **정교한 보상 설계(Reward Shaping)**와 **체계적인 하이퍼파라미터 최적화(HPO)**를 통해 성능을 극한으로 끌어올리는 실용적인 접근법을 취하였다.
+논문이 Transformer라는 강력한 모델을 통해 성능의 상한선을 제시했다면, 본 코드베이스는 **MLP라는 경량 모델**을 채택하고 **정교한 보상 설계(Reward Shaping)**와 **체계적인 하이퍼파라미터 최적화(HPO)**를 통해 성능을 극한으로 끌어올리는 실용적인 접근법을 취하였였다.
 
 ---
 
