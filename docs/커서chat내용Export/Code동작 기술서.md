@@ -24,7 +24,7 @@
     - `boxes_generator(...)`: 컨테이너 크기에 맞게 박스 시퀀스를 생성(분할 기반).
   - `packing_kernel.py`
     - `Container`, `Box` 등 엔진 레벨 로직(배치, 높이맵, 유효성 검사 등).
-  - 기타: `device_utils.py`, `train.py`, `ultimate_train_fix.py`, `vectorized_training.py`, `agents.py` 등 보조/대안 학습 루틴.
+  - 기타: `device_utils.py`, `train.py`, `vectorized_training.py`, `agents.py` 등 보조/대안 학습 루틴.
 
 ### **1.4 전체 동작의 흐름**
   1. `utils.boxes_generator`로 문제 인스턴스 생성 → 2. `PackingEnv`로 Gym 환경 구성 → 3. `ActionMasker`로 불가능 액션 제거 및 평탄화 거쳐 `MaskablePPO`에 전달 → 4. 보상 래퍼(개선형/강화형)로 보상 쉐이핑 → 5. `MaskablePPO` 학습 → 6. 다중 에피소드 평가 및 결과 저장 → 7. 분석 차트/요약 리포트 생성
@@ -245,7 +245,7 @@ flowchart TD
 
 #### **4.2.1. 설정/초기화**
   - **입력**: CLI 인자(`--num-boxes`, `--timesteps`, `--seed`, `--net-arch` 등)
-  - **주요 코드**: `production_final_test.py`, `enhanced_optimization.py`, `ultimate_train_fix.py`의 `argparse` 부분
+  - **주요 코드**: `production_final_test.py`, `enhanced_optimization.py`의 `argparse` 부분
   - **출력**: 실험 설정이 고정되고 로그/결과 경로가 준비됨
 
 #### **4.2.2. 데이터 생성**
@@ -267,7 +267,7 @@ flowchart TD
 #### **4.2.4. 에이전트/정책 생성**
   - **입력**: PPO 하이퍼파라미터(`learning_rate`, `n_steps`, `batch_size`, `net_arch`, `activation_fn` 등)
   - **처리**: `MaskablePPO("MultiInputPolicy", env, policy_kwargs=...)`
-  - **주요 코드**: `ultimate_train_fix.py`, `enhanced_optimization.py`, `production_final_test.py`
+  - **주요 코드**: `enhanced_optimization.py`, `production_final_test.py`
   - **출력**: 마스킹을 지원하는 PPO 에이전트
 
 #### **4.2.5. 학습 루프**
@@ -317,8 +317,6 @@ flowchart TD
 
 - GIF/시각화 시 `Monitor` 래퍼로 인한 속성 접근 오류는 이미 `env.unwrapped` 경로로 해결되어 있다.
 
-- 999-step hang 이슈는 `ultimate_train_fix.py`로 해결된 흐름을 그대로 따른다.
-
 - HPO를 돌릴 경우 같은 파이프라인이 trial마다 반복되며, 최적 파라미터가 `results/`에 누적 기록된다.
 
 - 평가 단계에서는 `deterministic=True` 설정으로 정책의 안정적 성능을 측정하고, 마스크는 항상 적용한다.
@@ -338,8 +336,6 @@ flowchart TD
 - 결과 해석은 `RESULTS_INTERPRETATION_GUIDE.md`의 지표 정의에 기반한다.
 
 - GIF 생성 파이프라인은 학습/평가 루프 바깥에서 `env.unwrapped.container`/`packed_boxes`를 읽어 프레임을 뽑는 별도 흐름이며, 학습 데이터 경로에는 간섭하지 않는다.
-
-- 끝으로, `ultimate_train_fix.py` 경로를 기준으로 실행하면 콜백/평가 타이밍이 안정화되어 999-step hang 없이 위 파이프라인을 그대로 실행한다.
 
 - 필요 시 실행 로그(`logs/*.csv`)와 모델 스냅샷(`models/*.zip`)을 통해 같은 파이프라인 상태를 재현할 수 있다.
 
@@ -567,19 +563,11 @@ elif reward_type == "interm_step":
 
 - 활용률(평가 계산)
   - \(u = \frac{\sum_{\text{placed}} w\cdot h\cdot d}{X\cdot Y\cdot Z}\)
-```1185:1202:src/ultimate_train_fix.py
-placed_volume += w*h*d
-container_volume = X*Y*Z
-return placed_volume / container_volume
-```
 
 ### **5.5 결합 점수(Combined Score)**
 
 - HPO/평가지표:  
-  \(\text{Combined} = 0.3\cdot \overline{R} + 0.7\cdot (100\cdot \overline{u})\)
-```1401:1404:src/ultimate_train_fix.py
-combined_score = mean_reward * 0.3 + mean_utilization * 100 * 0.7
-```
+  \(\text{Combined} = 0.3\cdot \overline{R} + 0.7\cdot (100\cdot \overline{u})\)s
 
 ### **5.6 높이맵(Height Map) 갱신**
 
@@ -816,12 +804,6 @@ RL-3DbinPacking/
   - `make_env`: 박스 생성→`PackingEnv`→`ImprovedRewardWrapper`(옵션)→`ActionMasker` 적용
   - `ImprovedRewardWrapper`: 활용률/속도/안정성/종료/시간·실패 페널티로 보상 강화
   - 실시간 모니터링 콜백, GIF 생성(시연용)
-- `src/ultimate_train_fix.py`
-  - 999-step hang 해결된 학습 엔트리(안전 콜백·평가 타임아웃)
-  - Optuna/W&B 통합 HPO: `run_optuna_optimization`, `run_wandb_sweep`, `run_hyperparameter_optimization`
-  - 목적함수: `combined_score = 0.3*mean_reward + 0.7*(mean_utilization*100)`
-  - 적응형 커리큘럼 콜백(`AdaptiveCurriculumCallback`) 포함
-  - `get_action_masks`, `make_env`는 `train_maskable_ppo.py`에서 가져와 재사용
 - `src/utils.py`
   - `boxes_generator`: 컨테이너 부피 보존 분할 기반 박스 집합 생성
   - 기하 유틸: `generate_vertices`, `cuboids_intersection`, `cuboid_fits`
@@ -864,21 +846,15 @@ RL-3DbinPacking/
 - `gifs/`: 학습/시연 GIF
 
 ### **6.5 파일 간 의존 관계(중요)**
-- `ultimate_train_fix.py` → `train_maskable_ppo.py`의 `make_env`, `get_action_masks` 재사용
 - 환경 내부 검증 로직: `packing_env.py` → `packing_kernel.py`에 위임(`action_mask`, 배치 검증)
 - 박스 데이터: `utils.boxes_generator` → `make_env`에서 사용
 
 ### **6.6 실행 포인트(예)**
-- 안전 학습(999해결):  
-  `python src/ultimate_train_fix.py --timesteps 15000 --eval-freq 2000 --num-boxes 16`
 - 프로덕션 코드의 검증:  
   `python production_final_test.py --num-boxes 32 --timesteps 50000
-- 최적화(Optuna):  
-  `python src/ultimate_train_fix.py --optimize --optimization-method optuna --n-trials 30`
 
 - 요약
   - `src/`는 환경/커널/보상/마스킹의 핵심.
-  - 학습은 `ultimate_train_fix.py` 중심(콜백/커리큘럼/HPO/999-fix).
   - 최적화·검증·디버깅은 루트의 전용 스크립트로 분리.
   - 결과는 일률적으로 `models/`, `logs/`, `results/`, `gifs/`에 저장.
   
