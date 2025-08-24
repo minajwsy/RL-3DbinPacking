@@ -279,7 +279,6 @@ flowchart TD
     - `Monitor`가 보상/길이/시간 로깅
   - **주요 포인트**:
     - 마스크는 매 스텝 동적으로 재계산
-    - 200박스에서는 스텝 수가 늘어 마스크 계산 호출이 많아짐
   - **출력**: 학습된 파라미터, `models/..zip`, `logs/*.csv`
 
 #### **4.2.6. 평가 루프**
@@ -310,15 +309,6 @@ flowchart TD
 - **리포트**: `results/validation_results_*.json`, `results/validation_summary_*.txt`
 - **대시보드(옵션)**: W&B/TensorBoard
 
-### **4.5 실행 예시(참고)**
-
-```bash
-# 64박스 파일럿
-python production_final_test.py --num-boxes 64 --timesteps 25000 --n-steps 2048 --net-arch 512,256
-
-# 200박스 본 실험
-python production_final_test.py --num-boxes 200 --timesteps 150000 --n-steps 4096 --net-arch 512,512,256
-```
 
 - 내부적으로는 위 다이어그램의 파이프라인을 그대로 실행한다. 결과는 `models/`, `logs/`, `results/`에 저장된다.
 
@@ -332,8 +322,6 @@ python production_final_test.py --num-boxes 200 --timesteps 150000 --n-steps 409
 - HPO를 돌릴 경우 같은 파이프라인이 trial마다 반복되며, 최적 파라미터가 `results/`에 누적 기록된다.
 
 - 평가 단계에서는 `deterministic=True` 설정으로 정책의 안정적 성능을 측정하고, 마스크는 항상 적용한다.
-
-- 실험 조건 비교(예: 논문 대비 200박스)는 `num_boxes`와 `timesteps`만으로 충분하며, 나머지 흐름은 동일하다.
 
 - 필요 시 `enhanced_optimization.py`의 전략(예: `stability_balanced`)에서 `num_boxes`만 증가시켜 동일 파이프라인으로 배치할 수 있다.
 
@@ -349,13 +337,9 @@ python production_final_test.py --num-boxes 200 --timesteps 150000 --n-steps 409
 
 - 결과 해석은 `RESULTS_INTERPRETATION_GUIDE.md`의 지표 정의에 기반한다.
 
-- 논문식 200박스 비교 시에도 SUR 유사 지표(활용률)와 `combined_score`를 병행 보고하면 파이프라인 일관성을 유지한다.
-
 - GIF 생성 파이프라인은 학습/평가 루프 바깥에서 `env.unwrapped.container`/`packed_boxes`를 읽어 프레임을 뽑는 별도 흐름이며, 학습 데이터 경로에는 간섭하지 않는다.
 
 - 끝으로, `ultimate_train_fix.py` 경로를 기준으로 실행하면 콜백/평가 타이밍이 안정화되어 999-step hang 없이 위 파이프라인을 그대로 실행한다.
-
-- 대규모(200박스)에서 병목이 보이면 `get_action_masks`와 보상 계산을 먼저 점검한다. 동일 파이프라인에서 가장 호출 빈도가 높은 부분이다.
 
 - 필요 시 실행 로그(`logs/*.csv`)와 모델 스냅샷(`models/*.zip`)을 통해 같은 파이프라인 상태를 재현할 수 있다.
 
@@ -366,8 +350,6 @@ python production_final_test.py --num-boxes 200 --timesteps 150000 --n-steps 409
 - 안정성 측면에서는 `Monitor`/`unwrapped` 접근, 함수 순서 정리, `activation_fn=nn.ReLU` 등 기존 수정 사항이 이미 반영되어 있다.
 
 - 따라서 현재 실험과 논문형 비교 실험 모두 위 파이프라인으로 안전하게 실행 가능하다.
-
-- 마지막으로, 200박스 실험 시 `results/`에 저장되는 JSON과 요약 텍스트에서 `combined_score`의 추이를 관측하면, 동일 파이프라인을 기반으로 한 설정간 공정 비교가 가능하다.
 
 - 필요하면 도식 이미지를 별도로 내보내 드리겠다.
 
@@ -384,7 +366,6 @@ python production_final_test.py --num-boxes 200 --timesteps 150000 --n-steps 409
 - 주요 수정/추가 없이 설명만 제공
 - 실행 파이프라인 다이어그램과 각 단계의 입력/처리/출력, 관련 파일/함수 명시
 - 학습 스텝 내부의의 데이터 흐름과 산출물 경로 정리
-- 200박스 확장 시 변경점만 별도 강조 (파이프라인 동일)
 - 실행 예시 커맨드 함께 제공
 
 ```plaintext
@@ -442,13 +423,6 @@ python production_final_test.py --num-boxes 200 --timesteps 150000 --n-steps 409
       └─(선택) Optuna/W&B가 반복 호출해 탐색 및 최적화
 ```
 
-```shellscript
-# 64박스 파일럿
-python production_final_test.py --num-boxes 64 --timesteps 25000 --n-steps 2048 --net-arch 512,256
-
-# 200박스 본 실험
-python production_final_test.py --num-boxes 200 --timesteps 150000 --n-steps 4096 --net-arch 512,512,256
-```
 
 ## 5. 핵심 데이터 구조 및 논문의 대응되는 수식
 
