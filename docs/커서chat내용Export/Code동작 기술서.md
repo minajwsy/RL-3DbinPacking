@@ -315,55 +315,6 @@ flowchart TD
 - **combined_score**는 코드 전반에서 동일 정의를 사용한다:
   - `combined_score = 0.3 * mean_reward + 0.7 * (mean_utilization * 100)`
 
-- GIF/시각화 시 `Monitor` 래퍼로 인한 속성 접근 오류는 이미 `env.unwrapped` 경로로 해결되어 있다.
-
-- HPO를 돌릴 경우 같은 파이프라인이 trial마다 반복되며, 최적 파라미터가 `results/`에 누적 기록된다.
-
-- 평가 단계에서는 `deterministic=True` 설정으로 정책의 안정적 성능을 측정하고, 마스크는 항상 적용한다.
-
-- 필요 시 `enhanced_optimization.py`의 전략(예: `stability_balanced`)에서 `num_boxes`만 증가시켜 동일 파이프라인으로 배치할 수 있다.
-
-- 코드 내 함수 대응: `create_env`/`make_env` 유틸로 환경 구성 → `ImprovedRewardWrapper`, `ActionMasker` → `MaskablePPO` 생성 → `model.learn` → 평가/지표 산출 → 결과 저장.
-
-- 장애 포인트가 재발하면 `gradual_expansion_debug.py`의 상세 로깅 버전으로 같은 파이프라인을 좁은 스케일에서 재현·디버깅한다.
-
-- 클라우드/CPU-only 모드에서는 `cpu_only_optimal_test.py`의 디바이스 강제 설정으로 동일 파이프라인을 CPU 상에서 재생한다.
-
-- 전체 플로우는 모듈화되어 있어, 학습/평가/최적화 어느 루트로 시작하든 동일한 관측→마스킹→정책→스텝→보상→로깅 데이터 흐름을 공유한다.
-
-- Optuna/W&B를 붙일 경우에도 다이어그램의 “설정→데이터→환경→학습→평가→지표” 체인이 trial 단위로 반복될 뿐, 추가적인 데이터 경로 변화는 없다.
-
-- 결과 해석은 `RESULTS_INTERPRETATION_GUIDE.md`의 지표 정의에 기반한다.
-
-- GIF 생성 파이프라인은 학습/평가 루프 바깥에서 `env.unwrapped.container`/`packed_boxes`를 읽어 프레임을 뽑는 별도 흐름이며, 학습 데이터 경로에는 간섭하지 않는다.
-
-- 필요 시 실행 로그(`logs/*.csv`)와 모델 스냅샷(`models/*.zip`)을 통해 같은 파이프라인 상태를 재현할 수 있다.
-
-- 위 다이어그램을 기준으로, 특정 단계에 대한 추가 세부 흐름(예: 보상 항목별 기여, 마스크 구성 규칙)을 더 풀어드릴 수 있다. 원하는 지점을 알려달라.
-
-- 핵심: 파이프라인은 단순·일관하며, 박스 개수 확장/하이퍼파라미터/HPO 여부와 관계없이 동일한 데이터 흐름을 유지한다.
-
-- 안정성 측면에서는 `Monitor`/`unwrapped` 접근, 함수 순서 정리, `activation_fn=nn.ReLU` 등 기존 수정 사항이 이미 반영되어 있다.
-
-- 따라서 현재 실험과 논문형 비교 실험 모두 위 파이프라인으로 안전하게 실행 가능하다.
-
-- 필요하면 도식 이미지를 별도로 내보내 드리겠다.
-
-- 문의 주신 ‘4. 실행 파이프라인 및 데이터 흐름’에 맞춰, 다이어그램과 단계별 대응을 위와 같이 정리하였다.
-
-- 다음 단계로, 현재 사용 중인 스크립트(`production_final_test.py` 또는 `enhanced_optimization.py`)에서 `num_boxes`만 늘려 위 파이프라인을 그대로 실행하길 권한다.
-
-- 추가로 HPO를 붙일지 여부는 리소스/시간 고려 후 결정하면 된다.
-
-- 최적화나 디버깅용 상세 로그가 필요하면 `gradual_expansion_debug.py`의 로깅 수준을 참조해 동일 파이프라인에 삽입하세요.
-
-- 더 구체적인 내부 데이터 형태(텐서 크기, 마스크 비트맵 예시)가 필요하시면 말씀해 달라.
-
-- 주요 수정/추가 없이 설명만 제공
-- 실행 파이프라인 다이어그램과 각 단계의 입력/처리/출력, 관련 파일/함수 명시
-- 학습 스텝 내부의의 데이터 흐름과 산출물 경로 정리
-- 실행 예시 커맨드 함께 제공
-
 ```plaintext
 [CLI/스크립트 인자]
       │  (예: num_boxes, timesteps, seed, net_arch ...)
@@ -434,7 +385,7 @@ flowchart TD
 ### **5.1 관측(Observation) 공간**
 
 - 형태
-  - height_map: \(H \in \mathbb{N}^{X \times Y}\), 컨테이너 상면 높이맵. 학습 입출력 시 1차원으로 평탄화되어 길이 \(X \cdot Y\)의 벡터.
+  - height_map: \(H \in \mathbb{N}^{X \times Y}\), 컨테이너 상면의 높이맵. 학습 입출력 시 1차원으로 평탄화된 길이 \(X \cdot Y\)의 벡터.
   - visible_box_sizes: \(B \in \mathbb{N}^{K \times 3}\), 가시 박스들의 \([x,y,z]\) 크기. 학습 입출력 시 길이 \(K \cdot 3\)의 벡터.
 
 - 코드 정의
@@ -814,23 +765,10 @@ RL-3DbinPacking/
 ### **6.3 학습/최적화/검증 스크립트(루트)**
 - 학습 실행
   - `production_final_test.py`: 프로덕션용 고정 파라미터 학습/평가
-- 고급 최적화
+- 최적화
   - `enhanced_optimization.py`: 전략별 설정(예: `stability_balanced`)로 다중 실험 배치
-  - `advanced_restoration.py`: 단계적 복원→확장→최종 최적화 파이프라인
-  - `systematic_hyperpara_search.py`, `refined_hyperparameter_optimization.py`, `focused_LR_optimization.py`: HPO/탐색 범위 실험
-  - 셸: `optimize_hyperparameters.sh`
 - 검증/비교
   - `production_final_test.py`: 베스트 파라미터 50k/50ep 평가
-  - `final_optimal_validation_fixed.py`, `corrected_optimal_validation.py`: 최적 vs 기본 파라미터 비교, 포맷팅 수정 반영
-  - `validate_optimal_params_fixed*.py`: 독립 환경 생성(`create_env`)로 “최적값” 재평가, 마스크/Monitor/활성화 함수 수정 반영
-  - `learning_rate_analysis.py`: LR 영향 분석
-- 디버깅/증상 재현
-  - `gradual_expansion_test*.py`, `gradual_expansion_debug.py`: 단계적 난이도 상승/마스크 출력/보상 추적
-  - `simple_action_mask_test.py`: 마스킹 최소 재현
-  - `existing_pytorch_test.py`, `cpu_only_optimal_test.py`(있다면): CUDA 충돌 회피/CPU 강제
-- 시각화/GIF
-  - `create_kamp_gif_fix.py`, `generate_gif_only.py`, `test_gif_generation.py`, `test_fixed_gif.py`
-  - `env.unwrapped.container`, `env.unwrapped.packed_boxes`로 `Monitor` 래핑 이슈 해결
 - 환경/설치
   - `requirements.txt`, `pyproject.toml`
   - `venv-setup1of3-manually.sh`, `venv-setup2of3.sh`, `venv-setup3of3.sh`
@@ -845,11 +783,11 @@ RL-3DbinPacking/
 - `results/`: 실험 요약/통계/시각화(`*.json`, `*.txt`, `*.png`)
 - `gifs/`: 학습/시연 GIF
 
-### **6.5 파일 간 의존 관계(중요)**
+### **6.5 파일 간 의존 관계**
 - 환경 내부 검증 로직: `packing_env.py` → `packing_kernel.py`에 위임(`action_mask`, 배치 검증)
 - 박스 데이터: `utils.boxes_generator` → `make_env`에서 사용
 
-### **6.6 실행 포인트(예)**
+### **6.6 실행 방법(예)**
 - 프로덕션 코드의 검증:  
   `python production_final_test.py --num-boxes 32 --timesteps 50000
 
@@ -867,11 +805,11 @@ RL-3DbinPacking/
 | 구분 | 논문 (Transformer) | 코드베이스 (MLP + MaskablePPO) |
 |------|------------------|------------------------------|
 | **박스 수** | **200 ~ 300개**<br>(BR1-15 벤치마크 스트림) | **12개** |
-| **도착 방식** | 온라인 스트림: 한 개씩 순차 도착 | 동일하게 온라인이지만<br>총 갯수가 12개로 고정 |
-| **박스 크기 분포** | 1 ~ 10 격자 길이까지 **소형 위주** → 한 컨테이너에 대부분 들어감 | `boxes_generator` 로 생성된 **중․대형 박스** 다수 → 몇 개만 잘못 넣어도 공간 손실 큼 |
+| **도착 방식** | 온라인 스트림: 한 개씩 순차 도착 | 동일하게 온라인이지만 총 갯수가 12개로 고정 |
+| **박스 크기 분포** | 1 ~ 10 격자 길이까지 **소형 위주** → 한 컨테이너에 대부분 들어감 | `boxes_generator` 로 생성된 **중․대형 박스** 다수<br>→ 몇 개만 잘못 넣어도 공간 손실 큼 |
 | **에피소드 길이** | 평균 **200 스텝+** (박스 전부 처리) | 최대 **50 스텝** |
 | **결정(액션) 수** | 훨씬 많음: O(컨테이너 좌표 × 200개) | 상대적으로 적음: O(컨테이너 좌표 × 12개) |
-| **난이도 특징** | **긴 의사결정 체인** → 누적 오차에 취약<br>• 박스가 작아 “재배치 여유”는 많음 | • **한 번의 결정이 치명적** → 큰 박스가 틀어지면 여유 공간 크게 손실<br>• 스텝 짧아 학습 피드백 빠름 |
+| **난이도 특징** | **긴 의사결정 체인** → 누적 오차에 취약<br>• 박스가 작아 “재배치 여유”는 많음 | • **한 번의 결정이 치명적** → 큰 박스가 틀어지면 여유공간 크게 손실<br>• 스텝 짧아 학습 피드백 빠름 |
 | **평가 지표** | Space Utilization (최종 활용률) | Reward + Utilization 혼합 (Combined Score) |
 
 ---
@@ -951,8 +889,7 @@ RL-3DbinPacking/
 | **주요 평가지표** | 공간 활용률 (SUR: Space Utilization Ratio) | **Combined Score**<br>(0.3\*Reward + 0.7\*Utilization) | 코드베이스는 보상과 활용률을 모두 고려하는 복합 지표를 사용해 더 안정적인 정책을 목표로 한다. |
 | **공간 활용률** | **약 35% ~ 45%** (표준 벤치마크 추정) | **20.3%**<br>(`production_final_test` 기준) | **[해석 주의]** 벤치마크가 달라 직접 비교는 무의미하다. 코드베이스의 20.3%는 실시간으로 박스가 주어지는 더 어려운 "Online" 문제 설정에 대한 결과이며, 이는 매우 준수한 성능이다. |
 | **학습 효율성** | 상대적으로 느리고 많은 자원 필요 | **매우 빠름** (최적 설정 학습에 **약 30분** 소요) | **코드베이스의 압도적 우위.** MLP 모델의 가벼움 덕분에 빠른 반복 실험(동일 GPU 1장 기준, MLP모델은 Transformer 대비 **학습 속도 ≥ 20×**)과 HPO 가능. 실제 서비스에서 재학습·배포 비용을 크게 절감해 준다. |
-| **최적화 전략** | RL + Heuristics (Beam Search) | 순수 RL + **자동화된 HPO 파이프라인**<br>(`enhanced_optimization.py`) | 코드베이스는 HPO 과정을 스크립트로 자동화하여, 논문 연구 못지않은 체계적인 최적화를 수행하였다. |
-| **최종 목표 달성** | 벤치마크 데이터셋에서 SOTA 달성 | **목표 점수(18.57) 대비 110.9% 달성**<br>(최종 20.591점) | 코드베이스는 설정된 목표를 초과 달성하며, 해당 문제에 대한 최적화를 성공적으로 완료했음을 입증하였다. |
+| **최적화 전략** | RL + Heuristics (Beam Search) | 순수 RL + **자동화된 HPO 파이프라인**<br>(`enhanced_optimization.py`) | 코드베이스는 HPO 과정을 스크립트로 자동화하여, 논문 연구 못지 않은 체계적인 최적화를 성공적으로 완료함함. |
 
 ---
 
@@ -964,7 +901,7 @@ RL-3DbinPacking/
     단순히 최종 활용률만 보상으로 주는 대신, 각 스텝마다의 **공간 효율성, 안정성, 배치 성공 여부** 등을 종합적으로 고려한 **Reward Shaping**을 통해 MLP 모델이 더 쉽게 최적 정책을 찾도록 유도하였다.
 
 2.  **체계적인 HPO 자동화 (`enhanced_optimization.py`)**:
-    이 스크립트는 본 프로젝트의 핵심 자산이다. 8가지가 넘는 하이퍼파라미터 조합을 자동으로 테스트하고, 결과를 시각화하여 최적의 설정(`PRODUCTION_OPTIMAL`)을 과학적으로 도출하였다. 이는 주먹구구식 튜닝을 배제하고 재현 가능한 성능 향상을 이끌었다.
+    이 스크립트는 본 프로젝트의 핵심 자산이다. 8가지가 넘는 하이퍼파라미터 조합을 자동으로 테스트하고, 결과를 시각화하여 최적의 설정(`PRODUCTION_OPTIMAL`)을 과학적으로 도출함 →   주먹구구식 튜닝을 배제하고 재현 가능한 성능 향상을 이끌었다.
 
 3.  **Action Masking의 효과적인 활용**:
     논문의 핵심 아이디어인 Action Masking을 `MaskablePPO` 라이브러리를 통해 효과적으로 구현하였다. 이를 통해 MLP 정책이 탐색해야 할 액션 공간을 대폭 줄여, 학습 효율을 극대화하였다.
@@ -976,10 +913,10 @@ RL-3DbinPacking/
 | | Heng et al. (논문) | 본 코드베이스 |
 | :--- | :--- | :--- |
 | **평가** | **이론적 상한선 제시** | **실용적 최적화의 성공 사례** |
-| **의의** | Transformer가 3D Bin Packing 문제에 효과적임을 입증한 선구적인 연구. | 논문의 핵심 아이디어를 경량 모델로 구현하고, 정교한 엔지니어링과 자동화된 HPO를 통해 **특정 문제 상황에서 목표를 초과 달성**할 수 있음을 입증. |
+| **의의** | Transformer가 3D Bin Packing 문제에 효과적임을 입증한 선구적인 연구. | 논문의 핵심 아이디어를 경량 모델로 구현하고, 정교한 엔지니어링과 자동화된 HPO를 통해 **특정 문제상황에서 문제를 해결**할 수 있음을 입증. |
 
-결론적으로, 본 코드베이스는 **"논문에서 제안된 비싼 Transformer 모델 없이도, 핵심 아이디어와 정교한 엔지니어링을 결합하면 목표 성능을 효율적으로 달성할 수 있다"**는 것을 성공적으로 보여준 사례이다. 이는 학술적 연구를 실제 산업 문제에 적용할 때 매우 중요한 실용적인 접근법을 제시한다.
+결론적으로, 본 코드베이스는 **"논문에서 제안된 비싼 Transformer 모델 없이도, 핵심 아이디어와 정교한 엔지니어링을 결합하면 목표 성능을 효율적으로 달성할 수 있다"**는 것을 성공적으로 보여준 사례이다. 이는 학술적 연구를 실제 산업문제에 적용할 때 매우 중요한 실용적인 접근법을 제시한다.
 
-**향후 작업**으로는 현재의 MLP 정책에 논문의 Self-Attention 메커니즘 일부를 결합한 **하이브리드 모델**을 탐색하여, 계산 효율성과 성능 표현력 사이의 새로운 최적점을 찾아보는 것을 진행할 수 있다.
+**향후 작업**으로는 현재의 MLP 정책에 논문의 Self-Attention 메커니즘 일부를 결합한 **하이브리드 모델**을 탐색하여, 계산 효율성과 표현력 사이의 새로운 최적 트레이드오프 지점을 찾아보는 추가 개발을 진행할 수 있다.
   
 > • **참고 문헌**: Heng et al., "Online 3D Bin Packing via Transformer-Based DRL"
