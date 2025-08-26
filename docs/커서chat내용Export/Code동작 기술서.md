@@ -1,6 +1,6 @@
 ## 1. 개요
 
-본 코드베이스는 이 분야의의 SOTA 논문에서 제안한 Transformer 기반 정책 대신, 계산 효율성이 높은 **MLP (Multi-Layer Perceptron) 정책**과 **MaskablePPO**를 결합하여 3D Bin Packing 문제를 해결하고자 한다. 이를 위해 논문의 핵심 아이디어인 **'Height Map' 상태 표현**과 **'Action Masking'**을 동일하게 채택하여, 경량화된 모델로도 유사한 수준의 성능에 도달하는 것을 목표로 한다. 
+본 코드베이스는 이 분야의 SOTA 논문에서 제안한 Transformer 기반 정책 대신, 계산 효율성이 높은 **MLP (Multi-Layer Perceptron) 정책**과 **MaskablePPO**를 결합하여 3D Bin Packing 문제를 해결하고자 한다. 이를 위해 논문의 핵심 아이디어인 **'Height Map' 상태 표현**과 **'Action Masking'**을 동일하게 채택하여, 경량화된 모델로도 유사한 수준의 성능에 도달하는 것을 목표로 한다. 
   
 ### **1.1 본 POC 개발의 목적**
   - 3D Bin Packing 환경에서 강화학습(Maskable PPO)로 컨테이너 활용률을 최대화.
@@ -884,12 +884,12 @@ RL-3DbinPacking/
 
 성능을 직접 비교하기는 어렵고 별 의미가 없다. 논문은 표준 벤치마크 데이터셋(e.g., BR1-15)에서의 성능을 보고하는 반면, 코드베이스는 `container=[10,10,10], boxes=12`라는 특정 문제 설정에 대한 성능을 측정하는 것으로 박스 수, 난이도가 다르기 때문이다. 코드베이스의 12개의 대형 박스 시나리오는 **적재 불가능 상태**가 자주 발생하여 활용률 상한이 낮음을 감안해야 한다.
 
-| 항목 | Heng et al. (Transformer) | 본 코드베이스 (MLP + MaskablePPO) | 분석 |
+| 항목 | Heng et al. (Transformer) | 코드베이스 (MLP + MaskablePPO) | 분석 |
 | :--- | :--- | :--- | :--- |
 | **주요 평가지표** | 공간 활용률 (SUR: Space Utilization Ratio) | **Combined Score**<br>(0.3\*Reward + 0.7\*Utilization) | 코드베이스는 보상과 활용률을 모두 고려하는 복합 지표를 사용해 더 안정적인 정책을 목표로 한다. |
 | **공간 활용률** | **약 35% ~ 45%** (표준 벤치마크 추정) | **20.3%**<br>(`production_final_test` 기준) | **[해석 주의]** 벤치마크가 달라 직접 비교는 무의미하다. 코드베이스의 20.3%는 실시간으로 박스가 주어지는 더 어려운 "Online" 문제 설정에 대한 결과이며, 이는 매우 준수한 성능이다. |
 | **학습 효율성** | 상대적으로 느리고 많은 자원 필요 | **매우 빠름** (최적 설정 학습에 **약 30분** 소요) | **코드베이스의 압도적 우위.** MLP 모델의 가벼움 덕분에 빠른 반복 실험(동일 GPU 1장 기준, MLP모델은 Transformer 대비 **학습 속도 ≥ 20×**)과 HPO 가능. 실제 서비스에서 재학습·배포 비용을 크게 절감해 준다. |
-| **최적화 전략** | RL + Heuristics (Beam Search) | 순수 RL + **자동화된 HPO 파이프라인**<br>(`enhanced_optimization.py`) | 코드베이스는 HPO 과정을 스크립트로 자동화하여, 논문 연구 못지 않은 체계적인 최적화를 성공적으로 완료함함. |
+| **최적화 전략** | RL + Heuristics (Beam Search) | 순수 RL + **자동화된 HPO 파이프라인**<br>(`enhanced_optimization.py`) | 코드베이스는 HPO 과정을 스크립트로 자동화하여, 논문 연구 못지 않은 체계적인 최적화를 성공적으로 완료함. |
 
 ---
 
