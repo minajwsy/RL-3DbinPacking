@@ -3,10 +3,10 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       
-      <link rel="stylesheet" href="file:///c:\Users\박정우\.vscode\extensions\shd101wyy.markdown-preview-enhanced-0.8.18\crossnote\dependencies\katex\katex.min.css">
+      <link rel="stylesheet" href="file:///c:\Users\박정우\.vscode\extensions\shd101wyy.markdown-preview-enhanced-0.8.19\crossnote\dependencies\katex\katex.min.css">
       
       
-      <script type="text/javascript" src="file:///c:\Users\박정우\.vscode\extensions\shd101wyy.markdown-preview-enhanced-0.8.18\crossnote\dependencies\mermaid\mermaid.min.js" charset="UTF-8"></script>
+      <script type="text/javascript" src="file:///c:\Users\박정우\.vscode\extensions\shd101wyy.markdown-preview-enhanced-0.8.19\crossnote\dependencies\mermaid\mermaid.min.js" charset="UTF-8"></script>
       
       
       <style>
@@ -24,7 +24,7 @@
     
       <div class="crossnote markdown-preview  ">
       
-<h3 id="3d-적재-최적화-ai-알고리듬---1페이지-브리핑경영진용">3D 적재 최적화 AI 알고리듬 - 1페이지 브리핑(경영진용) </h3>
+<h3 id="uld-적재-최적화를-위한-강화학습-ai-알고리듬---1페이지-브리핑경영진용">ULD 적재 최적화를 위한 강화학습 AI 알고리듬 - 1페이지 브리핑(경영진용) </h3>
 <h4 id="-핵심-비즈니스-가치">🚀 <strong>핵심 비즈니스 가치</strong> </h4>
 <blockquote>
 <p>"물리적으로 불가능한 배치는 사전에 차단하고, 성공적 배치 시 즉시 보상하는<br>경량 AI로 컨테이너 공간 활용률을 극대화한다"</p>
@@ -57,7 +57,8 @@
 </table>
 <img src="figULD.png" style="float:right; width:300px; margin:0 0 15px 20px; border:1px solid #ddd; border-radius:4px;">
 <h4 id="️-ai-알고리듬의-작동-원리5단계">⚙️ <strong>AI 알고리듬의 작동 원리(5단계)</strong> </h4>
-<div align="center" class="mermaid">flowchart TD
+<div style="display: flex; justify-content: right;">
+<div class="mermaid">flowchart TD
     A[1.입력] --&gt; B[2.상황 인식]
     B --&gt; C[3.가능성 필터링]
     C --&gt; D[4.AI 의사결정]
@@ -68,7 +69,8 @@
     C --&gt;|"Action Masking&lt;br&gt;- 경계/충돌/지지 불가&lt;br&gt; 위치 차단"| D
     D --&gt;|"경량 AI(MLP) + 강화학습(Maskable PPO)&lt;br&gt;박스 배치 최적 선택"| E
     E --&gt;|"Reward Shaping&lt;br&gt;활용률 상승 시 즉시 보상"| B
-</div><h4 id="-기술-전략의-차별점">🔑 <strong>기술 전략의 차별점</strong> </h4>
+</div></div>
+<h4 id="-기술-전략의-차별점">🔑 <strong>기술 전략의 차별점</strong> </h4>
 <ol>
 <li>
 <p><strong>높이맵(Height Map)</strong><br>
@@ -76,7 +78,8 @@
 </li>
 <li>
 <p><strong>액션 매스킹(Action Masking)</strong><br>
-물리적 제약(경계 초과/충돌/지지율 부족) 사전 계산 → 불가능한 선택지를 사전에 배제해 탐색 비용을 대폭 절감</p>
+물리적 제약(경계 초과/충돌/지지율 부족) 사전 계산 → 불가능한 선택지를<br>
+사전에 배제해 탐색 비용을 대폭 절감</p>
 </li>
 <li>
 <p><strong>경량 MLP 아키텍처</strong><br>
