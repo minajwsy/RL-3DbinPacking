@@ -195,7 +195,7 @@ graph TD
 flowchart TD
     A["🔧 CLI/스크립트 인자<br/>(num_boxes, timesteps, seed, net_arch)"] --> B["⚙️ 설정/초기화<br/>• 환경 등록(gym.register)<br/>• RNG/시드 설정<br/>• 로깅 디렉토리 생성"]
     
-    B --> C["📦 데이터 생성<br/>utils.boxes_generator → box_sizes"]
+    B --> C["📦 데이터(박스 리스트) 생성<br/>utils.boxes_generator → box_sizes"]
     
     C --> D["🏗️ 환경 생성<br/>gym.make('PackingEnv-v0')<br/>초기 관측: {height_map, visible_box_sizes}"]
     
