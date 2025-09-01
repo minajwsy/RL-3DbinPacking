@@ -1,15 +1,12 @@
 ## 1. 개요
 
-본 코드베이스는 이 분야의 SOTA 논문에서 제안한 Transformer 기반 정책 대신, 계산 효율성이 높은 **MLP (Multi-Layer Perceptron) 정책**과 **MaskablePPO**를 결합하여 3D Bin Packing 문제를 해결하고자 한다. 이를 위해 논문의 핵심 아이디어인 **'Height Map' 상태 표현**과 **'Action Masking'**을 동일하게 채택하여, 경량화된 모델로도 유사한 수준의 성능에 도달하는 것을 목표로 한다. 
+### **1.1 POC 개발의 목적**
+본 코드베이스는 기존 공항 수하물의 수작업에 의한 ULD 적재 처리 현장에서 인력관리, 작업효율 저하 등의 고질적인 문제를 극복하기 위하여 강화학습 AI 기술을 도입하여 ULD 적재 처리를 자동화하기 위한 POC를 개발하고자 하는 시도이다. 여기에서는 현재 이 분야의 SOTA 논문에서 제안된 Transformer 기반의 정책 대신, 계산 효율성이 높은 **MLP (Multi-Layer Perceptron) 정책**과 **MaskablePPO**를 결합하여 ULD 적재의 핵심 알고리듬인 3D Bin Packing 문제를 해결하고자 한다. 이를 위해 논문의 핵심 아이디어인 **Height Map 상태 표현**과 **Action Masking**을 동일하게 채택하되, 실용성을 고려하여 3D Bin Packing 환경에서 경량화된 강화학습(Maskable PPO) 모델로도 컨테이너 활용률의 최대화라라는 관점에서 유사한 수준의 성능에 도달하는 것을 목표로 한다. 
   
-### **1.1 본 POC 개발의 목적**
-  - 3D Bin Packing 환경에서 강화학습(Maskable PPO)로 컨테이너 활용률을 최대화.
-  - 상태는 컨테이너 높이맵 + 가시 박스 크기, 액션은 [가시 박스 선택 × XY좌표]의 단일 정수 인덱스.
-
 ### **1.2 최상위 실행 코드**
-  - `enhanced_optimization.py`: Phase 4 하이퍼파라미터 탐색/비교 자동화.
-  - `production_final_test.py`: 최적 설정(Phase 4 결과)으로 학습→평가→결과저장.
-  - `README.md`: 문제정의, 설치, 환경 소개.
+  - `enhanced_optimization.py`: 하이퍼파라미터 탐색/비교 자동화.
+  - `production_final_test.py`: 전 단계에서 도출된 최적 설정으로 학습→평가→결과 저장.
+  - `README.md`: 문제 정의, 설치, 환경 소개.
   - `results/`, `models/`, `logs/`, `gifs/`: 실행 산출물 저장.
 
 ### **1.3 핵심 모듈**
@@ -24,10 +21,10 @@
     - `boxes_generator(...)`: 컨테이너 크기에 맞게 박스 시퀀스를 생성(분할 기반).
   - `packing_kernel.py`
     - `Container`, `Box` 등 엔진 레벨 로직(배치, 높이맵, 유효성 검사 등).
-  - 기타: `device_utils.py`, `train.py`, `vectorized_training.py`, `agents.py` 등 보조/대안 학습 루틴.
+  - 기타: `device_utils.py` 등 보조 학습 루틴.
 
 ### **1.4 전체 동작의 흐름**
-  1. `utils.boxes_generator`로 문제 인스턴스 생성 → 2. `PackingEnv`로 Gym 환경 구성 → 3. `ActionMasker`로 불가능 액션 제거 및 평탄화 거쳐 `MaskablePPO`에 전달 → 4. 보상 래퍼(개선형/강화형)로 보상 쉐이핑 → 5. `MaskablePPO` 학습 → 6. 다중 에피소드 평가 및 결과 저장 → 7. 분석 차트/요약 리포트 생성
+  1. `utils.boxes_generator`로 문제 인스턴스 생성 → 2. `PackingEnv`로 Gym 환경 구성 → 3. `ActionMasker`로 불가능 액션 제거 및 평탄화 거쳐 `MaskablePPO`에 전달 → 4. 보상 래퍼로 보상 쉐이핑 → 5. `MaskablePPO` 학습 → 6. 다중 에피소드 평가 및 결과 저장 → 7. 요약 리포트 생성
 
 ### **1.5 실행 방법**
   - 최적화 탐색:
@@ -40,16 +37,15 @@
   - 루트에서 실행해야 `sys.path.append('src')`가 올바르게 동작한다.
 
 ### **1.6 참고 논문과의 관련성 검토**
-  - 참고 논문이 Transformer 정책을 사용하는 것과 달리 본 코드는 Transformer 정책 대신에 MLP 정책 + MaskablePPO를 사용하고 있다.
-  - 공통점: 높이맵 기반 상태 표현, 불가능 액션의 마스킹으로 탐색 공간 축소, 활용률 중심의 보상 설계, 멀티 시드 다중 에피소드 평가.
-  - 차이점: 논문은 Transformer 기반 정책/시퀀스 모델링을 활용하는 반면, 본 코드는 MLP `net_arch`로 정책/가치망을 구성함.
----  
+  - 참고 논문이 Transformer 정책을 사용하는 것과 달리 본 코드는 Transformer 정책 대신에 MLP 정책 + MaskablePPO를 사용한다.
+  - 공통점: 높이맵 기반 상태 표현, 불가능 액션의 마스킹으로 탐색 공간 축소, 활용률 중심의 보상 설계.
+  - 차이점: 논문은 Transformer 기반 정책/시퀀스 모델링을 활용하는 반면, 본 코드는 MLP `net_arch`로 정책/가치망을 구성하고 있다.
 
 | 구분 | Heng et al. (논문) | 본 코드베이스 |
 | :--- | :--- | :--- |
 | **정책 모델** | Transformer (Encoder-Decoder) | **MLP** + MaskablePPO |
 | **상태 표현** | Height Map + Next-Item-List | 동일 |
-| **액션 처리** | Illegal Action Masking | `get_action_masks()`로 동일 구현 |
+| **액션 처리** | Illegal Action Masking | `get_action_masks()`로 동일하게 구현 |
 | **보상 설계** | 최종 공간 활용률 (Terminal Reward) | 최종 활용률 + **Reward Shaping** (`ImprovedRewardWrapper`) |
 
 ---
@@ -58,8 +54,8 @@
 
 | 파일 경로 | 목적 | 논문 관점의 역할 |
 | :--- | :--- | :--- |
-| **`enhanced_optimization.py`** | **Phase-4 정밀 하이퍼파라미터 탐색**: 8가지 전략(stability, architecture, optimization)을 병렬로 학습하고 비교 분석한다. | 논문의 **"Ablation Studies"** (Table 5)와 유사. 다양한 하이퍼파라미터 조합의 성능을 체계적으로 비교하여 최적 설정을 도출한다. |
-| **`production_final_test.py`** | **Phase-4 최종 검증**: `enhanced_optimization.py`에서 도출된 최적 설정(`PRODUCTION_OPTIMAL`)을 고정하여, 대규모(50 에피소드) 반복 테스트로 성능의 안정성과 재현성을 검증한다. | 논문의 **"Performance Comparison"** (Table 4)의 *Best-Config 재현 실험* 단계와 유사. 최종 제안 모델의 성능을 보고하기 위한 검증 단계이다. |
+| **`enhanced_optimization.py`** | **정밀 하이퍼파라미터 탐색**: 8가지 전략(stability, architecture, optimization)을 병렬로 학습하고 비교 분석한다. | 논문의 **"Ablation Studies"** (Table 5)와 유사. 다양한 하이퍼파라미터 조합의 성능을 체계적으로 비교하여 최적 설정을 도출한다. |
+| **`production_final_test.py`** | **최적화 결과의 최종 검증**: `enhanced_optimization.py`에서 도출된 최적 설정(`PRODUCTION_OPTIMAL`)을 고정하여, 대규모(50 에피소드) 반복 테스트로 성능의 안정성과 재현성을 검증한다. | 논문의 **"Performance Comparison"** (Table 4)의 *Best-Config 재현 실험* 단계와 유사. 최종 제안 모델의 성능을 보고하기 위한 검증 단계이다. |
 
 ---
 
@@ -80,7 +76,7 @@
 - **`train_maskable_ppo.py`**
   - **역할**: Maskable PPO 학습의 핵심 엔진. `make_env` 함수를 통해 환경 생성 및 래퍼 적용을 담당한다.
   - **주요 기능**:
-    - `make_env()`: `PackingEnv`를 생성하고 `ActionMasker`, `ImprovedRewardWrapper` 등의 래퍼를 적용. 'ActionMasker(env, mask_fn)'로 정책에 유효 액션 마스크 전달하며, **MaskablePPO + MLP + Mask**로 정책의 탐색 공간을 축소한다.
+    - `make_env()`: `PackingEnv`를 생성하고 `ActionMasker`, `ImprovedRewardWrapper` 등의 래퍼를 적용. 'ActionMasker(env, mask_fn)'로 정책에 유효 액션 마스크를 전달하며, **MaskablePPO + MLP + Mask**로 정책의 탐색 공간을 축소한다.
     - `get_action_masks()`: 현재 상태에서 가능한 액션을 계산하여 마스크를 반환한다.
     - `ImprovedRewardWrapper`: 기본 보상(환경) + 활용률 증가 보상 + 박스 배치 보상 + 효율/안정성 보너스 + 종료 보너스 + 지연·실패 페널티로 구성. 공간 활용률과 배치된 박스 수를 기반으로 보상을 동적으로 조절하여(실시간 Reward Shaping) 학습을 효율화한다.
   - **의존성**: `packing_env`, `utils`, `device_utils`
@@ -112,7 +108,7 @@
   - **역할**: 박스 생성을 포함한 다양한 기하학적 유틸리티 함수를 제공한다.
   - **핵심 함수**:
     - `boxes_generator()`:  생성된 박스의 총 부피가 주어진 컨테이너 부피와 동일하도록 랜덤한 박스 크기 리스트를 생성한다.
-    - `generate_vertices()`: 3D 박스의 8개 꼭짓점 좌표를 계산하여 시각화에 사용한다.
+    - `generate_vertices()`: 3D 박스 내 꼭지점 8개의 좌표를 계산하여 시각화에 사용한다.
     - `cuboids_intersection()`: 두 박스가 공간적으로 겹치는지 검사한다.
     - `cuboid_fits()`: 박스 배치 가능성을 검사한다.
 
@@ -124,38 +120,6 @@
     - `log_system_info()`: 시스템 환경(OS, Python, PyTorch, CUDA 버전)을 출력한다.
 
 ---
-
-```python
-# 경계 포함, 코너 동일 고도, 바닥면 최대고도 일치
-support_perc = int((count_level/(box.size[0]*box.size[1]))*100)
-if support_perc < check_area: return 0
-# 컨테이너 적합성 + 충돌 없음
-```
-```python
-height_map[x:x+w, y:y+h] += z
-```
-
-```python
-self.observation_space = gym.spaces.Dict({...})
-self.action_space = Discrete(X*Y*K)
-```
-
-```python
-box_index = action // (X*Y); res = action % (X*Y)
-position = [res // X, res % X]
-```
-
-```python
-# 박스별 2D 마스크 → 평탄화하여 결합
-```
-
-```python
-# make_env: 생성 → (개선 보상) → ActionMasker(mask_fn) → seed
-```
-
-```python
-# ImprovedRewardWrapper: 활용률/박스/효율/안정성/종료/시간/실패 보정
-```
 
 ## 4. 실행 파이프라인 및 데이터 흐름
 
@@ -184,12 +148,9 @@ graph TD
 1.  **`enhanced_optimization.py`**: 8개의 다른 하이퍼파라미터로 모델을 학습/평가하여 최상의 조합(`PRODUCTION_OPTIMAL`)을 찾는다.
 2.  **`production_final_test.py`**: 위에서 찾은 최적 조합으로만 모델을 다시 학습하고, 더 많은 에피소드로 평가하여 성능을 최종 검증한다.
 
----
 실행 파이프라인과 데이터 흐름을 상기 다이어그램과 함께 상세하게 설명한다.
 
-### **4.1 전체 실행 파이프라인 다이어그램**
-
-#### 3D Bin Packing 전체 실행 파이프라인
+### **4.1 코드베이스 전체의 실행 파이프라인 다이어그램**
 
 ```mermaid
 flowchart TD
@@ -257,8 +218,8 @@ flowchart TD
   - **입력**: `container_size`, `box_sizes`, `num_visible_boxes`
   - **처리**:
     - `gym.make("PackingEnv-v0", ...)`로 `PackingEnv` 인스턴스 생성
-    - `ImprovedRewardWrapper` 적용: 부분 적재, 높이 평탄화, 충돌 회피 등 보상 신호를 단계별로 보강 -> 보상 셰이핑(Reward Shaping)
-    - 보상 셰이핑(Reward Shaping)의 개념: 에이전트가 더 빠르고 효율적으로 학습하도록 돕기 위해 기존의 보상(reward) 시스템에 추가적인 보상을 설계하여 제공하는 기술. 특히, 최종 목표 달성까지 오랜 시간이 걸리거나, 목표를 달성했을 때만 보상이 주어지는 희소한(sparse) 보상 환경에서 학습 속도를 높이는 데 효과적임
+    - `ImprovedRewardWrapper` 적용: 부분 적재, 높이 평탄화, 충돌 회피 등 보상 신호를 단계별로 보강 -> 보상 쉐이핑(Reward Shaping)
+    - 보상 쉐이핑(Reward Shaping)의 개념: 에이전트가 더 빠르고 효율적으로 학습하도록 돕기 위해 기존의 보상(reward) 시스템에 추가적인 보상을 설계하여 제공하는 기술. 특히, 최종 목표 달성까지 오랜 시간이 걸리거나, 목표를 달성했을 때만 보상이 주어지는 희소한(sparse) 보상 환경에서 학습 속도를 높이는 데 효과적임
     - `ActionMasker(env, get_action_masks)` 적용: `get_action_masks`가 불가능 액션을 필터링
     - `Monitor`, `DummyVecEnv` 적용: 스텝·리셋 로깅, 벡터화 학습 준비
   - **주요 코드**: `src/packing_env.py`, `src/train_maskable_ppo.py`의 `ImprovedRewardWrapper`, `get_action_masks`
@@ -278,7 +239,7 @@ flowchart TD
     - `ImprovedRewardWrapper` → reward_t_shaped
     - `Monitor`가 보상/길이/시간 로깅
   - **주요 포인트**:
-    - 마스크는 매 스텝 동적으로 재계산
+    - 마스크는 매 스텝마다 동적으로 재계산
   - **출력**: 학습된 파라미터, `models/..zip`, `logs/*.csv`
 
 #### **4.2.6. 평가 루프**
@@ -299,7 +260,7 @@ flowchart TD
 - **마스크**: `mask = get_action_masks(env) → shape = [action_space_n] (bool)`
 - **정책 전개**: `action = π(obs, mask)` → 무효인 액션의 확률 0 처리
 - **환경 전개**: `next_obs, reward_raw, done, info = env.step(action)`
-- **보상 셰이핑**: `reward = ImprovedRewardWrapper(reward_raw, state, action, info)`
+- **보상 쉐이핑**: `reward = ImprovedRewardWrapper(reward_raw, state, action, info)`
 - **로깅**: `Monitor`가 `ep_rew`, `ep_len`, `timestep` 기록
 
 ### **4.4  산출물 및 경로**
@@ -309,76 +270,20 @@ flowchart TD
 - **리포트**: `results/validation_results_*.json`, `results/validation_summary_*.txt`
 - **대시보드(옵션)**: W&B/TensorBoard
 
-
 - 내부적으로는 위 다이어그램의 파이프라인을 그대로 실행한다. 결과는 `models/`, `logs/`, `results/`에 저장된다.
 
-- **combined_score**는 코드 전반에서 동일 정의를 사용한다:
+- **combined_score**는 코드 전반에서 동일한 정의를 사용한다:
   - `combined_score = 0.3 * mean_reward + 0.7 * (mean_utilization * 100)`
+---
 
-```plaintext
-[CLI/스크립트 인자]
-      │  (예: num_boxes, timesteps, seed, net_arch ...)
-      ▼
-[설정/초기화]
-  - 환경 등록(gym.register)
-  - RNG/시드 설정
-  - 로깅 디렉토리 생성
-      │
-      │ uses
-      ▼
-[데이터 생성]
-  - utils.boxes_generator → box_sizes
-      │
-      │ feeds
-      ▼
-[환경 생성 gym.make("PackingEnv-v0")]
-  - 초기 관측 obs: {"height_map", "visible_box_sizes"}
-      │
-      ├─▶ [ImprovedRewardWrapper] (보상 shaping)
-      │
-      ├─▶ [ActionMasker(get_action_masks)] (유효/무효 액션 마스킹)
-      │
-      └─▶ [Monitor/DummyVecEnv] (에피소드/타임스텝 로깅, 벡터화)
-      │
-      ▼
-[에이전트/정책 생성]
-  - MaskablePPO("MultiInputPolicy", policy_kwargs=net_arch/activation_fn, ...)
-      │
-      ▼
-[학습 루프 model.learn(total_timesteps)]
-  (반복)
-   ┌──────────────────────────────────────────────────────────┐
-   │ 1) 관측 obs_t 수집                                      │
-   │ 2) get_action_masks(env) → mask_t                        │
-   │ 3) 정책 π(a|s,mask) → action_t                           │
-   │ 4) env.step(action_t) → (obs_{t+1}, reward_t, done, ...) │
-   │ 5) ImprovedRewardWrapper가 reward_t를 shaping            │
-   │ 6) Monitor가 로그 기록                                   │
-   └──────────────────────────────────────────────────────────┘
-      │
-      ▼
-[평가 loop (deterministic/with masks)]
-  - 동일 관측/마스킹/정책 추론/스텝
-  - 에피소드 별 보상/활용률 집계
-      │
-      ▼
-[지표 산출/저장]
-  - mean_reward, mean_utilization, success_rate
-  - combined_score = 0.3*mean_reward + 0.7*(mean_utilization*100)
-  - logs/, models/, results/에 저장
-      │
-      └─(선택) Optuna/W&B가 반복 호출해 탐색 및 최적화
-```
+## 5. 핵심 데이터 구조
 
-
-## 5. 핵심 데이터 구조 및 논문의 대응되는 수식
-
-| 항목 | 정의 | 논문 수식 대응 |
-| :--- | :--- | :--- |
-| **상태 (Observation)** | `obs = {'height_map', 'visible_box_sizes'}` | `s_t = (M_t, B_t)` (Eq. 1) |
-| **액션 (Action)** | `Discrete(W * H * 6)` | `a_t = (p_t, o_t)` (Eq. 2) |
-| **액션 마스크 (Action Mask)** | `get_action_masks()`가 반환하는 `bool` 배열 | `m_t` (Fig. 3) |
-| **주요 평가지표** | `combined_score = 0.3*reward + 0.7*utilization*100` | 논문에는 없는, 본 코드베이스 고유의 KPI |
+| 항목 | 정의 | 
+| :--- | :--- | 
+| **상태 (Observation)** | `obs = {'height_map', 'visible_box_sizes'}` | 
+| **액션 (Action)** | `Discrete(W * H * 6)` | 
+| **액션 마스크 (Action Mask)** | `get_action_masks()`가 반환하는 `bool` 배열 |
+| **주요 평가지표** | `combined_score = 0.3*reward + 0.7*utilization*100` |
 
  다음에 코드 라인 인용과 함께 핵심 데이터 구조와 수식을 정리한다.
 
@@ -473,14 +378,6 @@ return [x == 1 for x in act_mask.flatten()]
      \(\text{support\_perc} = \frac{\#\{H=\text{lev}\}}{w\cdot h}\cdot 100 \ge \text{check\_area}\)
   5) 컨테이너 내 완전 적합: `cuboid_fits(container, box)`
   6) 기존 박스와의 충돌 없음: `not cuboids_intersection(...)`
-```299:407:src/packing_kernel.py
-# 1) in-bounds check of bottom vertices ...
-# 2) equal corner levels
-# 3) corners at maximal bottom-face height
-# 4) support percentage >= check_area
-# 5) cuboid_fits(container_min_max, dummy_box_min_max)
-# 6) no intersection with other boxes
-```
 
 ### **5.4 보상(Reward) 수식**
 
@@ -494,7 +391,7 @@ elif reward_type == "interm_step":
     reward = packed_volume / ((max_x-min_x)*(max_y-min_y)*(max_z-min_z))
 ```
 
-- ImprovedRewardWrapper(선택적)로 보상 셰이핑
+- ImprovedRewardWrapper(선택적)로 보상 쉐이핑
   - 활용률 개선 보상: \(\Delta u > 0 \Rightarrow +2.0 \cdot \Delta u\)
   - 박스 배치 보상: \(\Delta n > 0 \Rightarrow +0.5 \cdot \Delta n\)
   - 효율 보너스: \(+0.1 \cdot (1 - \frac{\text{step}}{\text{max\_steps}})\)
@@ -502,15 +399,6 @@ elif reward_type == "interm_step":
   - 종료 보너스: \(u>0.8\Rightarrow +5.0;\; u>0.6\Rightarrow +2.0;\; u>0.4\Rightarrow +1.0;\) else \(-1.0\)
   - 지연 페널티: \(\text{step} > 0.8\cdot \text{max\_steps} \Rightarrow -0.01\)
   - 실패 페널티: \(\text{truncated} \land u<0.3 \Rightarrow -2.0\)
-```920:967:src/train_maskable_ppo.py
-# utilization_improvement * 2.0
-# box_improvement * 0.5
-# efficiency_bonus ~ 0.1*(1 - step/max_steps)
-# stability_bonus accrual
-# terminal bonuses (+5,+2,+1 or -1)
-# time penalty -0.01
-# failure penalty -2.0
-```
 
 - 활용률(평가 계산)
   - \(u = \frac{\sum_{\text{placed}} w\cdot h\cdot d}{X\cdot Y\cdot Z}\)
@@ -535,10 +423,7 @@ self.height_map[
 
 - 컨테이너 크기를 시작으로, 부피/중심치 편향 가중으로 축을 선택하여 이분 분할을 반복해 총 `num_items` 크기 집합 생성. 부피 보존.  
   결과는 컨테이너에 “이론상” 꽉 채울 수 있는 조합을 만들 확률이 높음.
-```12:71:src/utils.py
-# volume-weighted parent selection → axis selection (edge-length weighted)
-# split point center-biased → two boxes → 반복
-```
+
 
 ### **5.8 핵심 자료구조 요약**
 
@@ -559,114 +444,7 @@ self.height_map[
 - 마스크는 박스별 유효 좌표를 결합해 길이 `K·X·Y`의 불리언 벡터로 제공.
 - 보상은 기본(종료/중간) 공식에 더해 개선 래퍼가 단계별 가중 보상/페널티를 추가.
 - 최적화 목적은 `0.3*보상 + 0.7*(활용률*100)`의 결합 점수.
-
-```python
-# ...
-# Observation space
-self.observation_space = gym.spaces.Dict(observation_dict)
-# Action space
-self.action_space = Discrete(
-    container_size[0] * container_size[1] * num_visible_boxes
-)
-```
-
-```python
-observation_dict = {
-    "height_map": MultiDiscrete(height_map_repr),
-    "visible_box_sizes": MultiDiscrete(box_repr),
-}
-```
-
-```python
-height_map_repr = np.ones(
-    shape=(container_size[0], container_size[1]), dtype=np.int64
-) * (container_size[2] + 1)
-height_map_repr = np.reshape(
-    height_map_repr, newshape=(container_size[0] * container_size[1],)
-)
-```
-
-```python
-box_repr = np.zeros(shape=(num_visible_boxes, 3), dtype=np.int32)
-box_repr[:] = self.container.size + [1, 1, 1]
-box_repr = np.reshape(box_repr, newshape=(num_visible_boxes * 3,))
-```
-
-```python
-dummy_box_size = self.container.size
-num_dummy_boxes = self.num_visible_boxes - len(self.unpacked_visible_boxes)
-box_size_list = [box.size for box in self.unpacked_visible_boxes] + [dummy_box_size] * num_dummy_boxes
-self.state["visible_box_sizes"] = np.reshape(box_size_list, (self.num_visible_boxes * 3,))
-```
-
-```python
-box_index = action // (self.container.size[0] * self.container.size[1])
-res = action % (self.container.size[0] * self.container.size[1])
-position = np.array([res // self.container.size[0], res % self.container.size[0]])
-return box_index, position.astype(np.int32)
-```
-
-```python
-action = (box_index * self.container.size[0] * self.container.size[1]
-          + position[0] * self.container.size[0]
-          + position[1])
-```
-
-```python
-act_mask = np.zeros((self.num_visible_boxes, self.container.size[0] * self.container.size[1]), dtype=np.int8)
-for index in range(len(self.unpacked_visible_boxes)):
-    acm = self.container.action_mask(box=self.unpacked_visible_boxes[index], check_area=100)
-    act_mask[index] = np.reshape(acm, (self.container.size[0] * self.container.size[1],))
-return [x == 1 for x in act_mask.flatten()]
-```
-
-```python
-# 1) in-bounds check of bottom vertices ...
-# 2) equal corner levels
-# 3) corners at maximal bottom-face height
-# 4) support percentage >= check_area
-# 5) cuboid_fits(container_min_max, dummy_box_min_max)
-# 6) no intersection with other boxes
-```
-
-```python
-if reward_type == "terminal_step":
-    reward = packed_volume / container_volume
-elif reward_type == "interm_step":
-    reward = packed_volume / ((max_x-min_x)*(max_y-min_y)*(max_z-min_z))
-```
-
-```python
-# utilization_improvement * 2.0
-# box_improvement * 0.5
-# efficiency_bonus ~ 0.1*(1 - step/max_steps)
-# stability_bonus accrual
-# terminal bonuses (+5,+2,+1 or -1)
-# time penalty -0.01
-# failure penalty -2.0
-```
-
-```python
-placed_volume += w*h*d
-container_volume = X*Y*Z
-return placed_volume / container_volume
-```
-
-```python
-combined_score = mean_reward * 0.3 + mean_utilization * 100 * 0.7
-```
-
-```python
-self.height_map[
-    box.position[0] : box.position[0] + box.size[0],
-    box.position[1] : box.position[1] + box.size[1],
-] += box.size[2]
-```
-
-```python
-# volume-weighted parent selection → axis selection (edge-length weighted)
-# split point center-biased → two boxes → 반복
-```
+---
 
 ## 6. 디렉토리 및 파일의 구조
 
@@ -882,7 +660,7 @@ RL-3DbinPacking/
 
 #### **7.2.2. 정량적 성능 비교 분석**
 
-성능을 직접 비교하기는 어렵고 별 의미가 없다. 논문은 표준 벤치마크 데이터셋(e.g., BR1-15)에서의 성능을 보고하는 반면, 코드베이스는 `container=[10,10,10], boxes=12`라는 특정 문제 설정에 대한 성능을 측정하는 것으로 박스 수, 난이도가 다르기 때문이다. 코드베이스의 12개의 대형 박스 시나리오는 **적재 불가능 상태**가 자주 발생하여 활용률 상한이 낮음을 감안해야 한다.
+성능을 직접 비교하기는 어렵고 별 의미가 없다. 논문은 표준 벤치마크 데이터셋(e.g., BR1-15)에서의 성능을 보고하는 반면, 코드베이스는 `container=[10,10,10], boxes=12`라는 특정한 문제 설정에 대한 성능을 측정하는 것으로 박스 수, 난이도가 다르기 때문이다. 코드베이스의 12개의 대형 박스 시나리오는 **적재 불가능 상태**가 자주 발생하여 활용률 상한이 낮음을 감안해야 한다.
 
 | 항목 | Heng et al. (Transformer) | 코드베이스 (MLP + MaskablePPO) | 분석 |
 | :--- | :--- | :--- | :--- |
@@ -915,7 +693,7 @@ RL-3DbinPacking/
 | **평가** | **이론적 상한선 제시** | **실용적 최적화의 성공 사례** |
 | **의의** | Transformer가 3D Bin Packing 문제에 효과적임을 입증한 선구적인 연구. | 논문의 핵심 아이디어를 경량 모델로 구현하고, 정교한 엔지니어링과 자동화된 HPO를 통해 **특정 문제상황에서 문제를 해결**할 수 있음을 입증. |
 
-결론적으로, 본 코드베이스는 **"논문에서 제안된 비싼 Transformer 모델 없이도, 핵심 아이디어와 정교한 엔지니어링을 결합하면 목표 성능을 효율적으로 달성할 수 있다"**는 것을 성공적으로 보여준 사례이다. 이는 학술적 연구를 실제 산업문제에 적용할 때 매우 중요한 실용적인 접근법을 제시한다.
+결론적으로, 본 코드베이스는 **논문에서 제안된 비싼 Transformer 모델 없이도, 핵심 아이디어와 정교한 엔지니어링을 결합하면 목표 성능을 효율적으로 달성할 수 있다**는 것을 성공적으로 보여준 사례이다. 이는 학술적 연구를 실제 산업문제에 적용할 때 매우 중요한 실용적인 접근법을 제시한다.
 
 **향후 작업**으로는 현재의 MLP 정책에 논문의 Self-Attention 메커니즘 일부를 결합한 **하이브리드 모델**을 탐색하여, 계산 효율성과 표현력 사이의 새로운 최적 트레이드오프 지점을 찾아보는 추가 개발을 진행할 수 있다.
   
