@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>ETRI 연구인력 현장지원 실적보고서</title>
+<style>
+  body { font-family: "Malgun Gothic","맑은 고딕",Arial,sans-serif; line-height:1.55; font-size:11pt; color:#222; }
+  h1 { font-size:20pt; margin:0 0 14px 0; }
+  h2 { font-size:14pt; margin:18px 0 8px 0; }
+  h3 { font-size:12pt; margin:14px 0 6px 0; }
+  .meta { margin:8px 0 16px 0; }
+  .kv { margin:2px 0; }
+  .sec { margin-top:14px; }
+  ul { margin:6px 0 6px 18px; }
+  table { border-collapse:collapse; width:100%; margin:6px 0; }
+  th,td { border:1px solid #ccc; padding:6px 8px; vertical-align:top; }
+  .small { color:#555; font-size:10pt; }
+</style>
+</head>
+<body>
+
+<h1>ETRI 연구인력 현장지원 실적보고서</h1>
+
+<div class="meta">
+  <div class="kv"><b>과제명</b> : 강화학습 기반 3D Bin Packing 최적화 시스템 개발(ULD 적재 자동화)</div>
+  <div class="kv"><b>지원기간</b> : 2024.07 ~ 2025.09</div>
+  <div class="kv"><b>지원기관</b> : 한국전자통신연구원(ETRI)</div>
+  <div class="kv"><b>현장기업</b> : (기입)</div>
+  <div class="kv"><b>지원연구원</b> : 박정우</div>
+  <div class="kv small">본 보고서는 Code동작 기술서 및 실행 산출물(results/, models/, logs/) 근거로 작성</div>
+</div>
+
+<div class="sec">
+  <h2>1. 지원 배경 및 목적</h2>
+  <ul>
+    <li>수작업 의존 ULD 적재의 효율 저하/인력 운영 문제 해소를 위한 자동화 PoC 구축</li>
+    <li>강화학습(RL) 기반 3D Bin Packing으로 컨테이너 공간 활용률 극대화</li>
+    <li>연구용 Transformer 대신 <b>경량 MLP + MaskablePPO</b>로 실용 성능·비용 최적화</li>
+  </ul>
+</div>
+
+<div class="sec">
+  <h2>2. 지원 내용</h2>
+
+  <h3>2.1 시스템/모듈 구조 설계</h3>
+  <ul>
+    <li><b>환경</b>(<code>src/packing_env.py</code>): 관측(Height Map, visible_box_sizes), 액션(Discrete: 위치×가시박스)</li>
+    <li><b>커널</b>(<code>src/packing_kernel.py</code>): 배치/충돌/지지율/높이맵 갱신 로직</li>
+    <li><b>학습</b>(<code>src/train_maskable_ppo.py</code>): <code>make_env()</code>, <code>get_action_masks()</code>, <code>ImprovedRewardWrapper</code></li>
+    <li><b>유틸</b>(<code>src/utils.py</code>): <code>boxes_generator()</code> 등 기하 유틸</li>
+  </ul>
+
+  <h3>2.2 핵심 알고리즘 구현</h3>
+  <ul>
+    <li><b>Action Masking</b>: 불가능 좌표/배치 조합 사전 제거 → 탐색 공간 축소</li>
+    <li><b>Reward Shaping</b>: 활용률 개선·배치 성공·효율/안정성 보너스, 지연/실패 페널티</li>
+    <li><b>결합 점수</b>: 0.3×mean_reward + 0.7×(mean_utilization×100)</li>
+  </ul>
+
+  <h3>2.3 안정성/운영 이슈 해결</h3>
+  <ul>
+    <li><b>999 스텝 무한대기</b>: 평가 타임아웃·주기 제어 콜백으로 해소</li>
+    <li><b>CUDA/의존성</b>: CPU-only 실행 모드, 의존성 고정</li>
+    <li><b>Import/Type</b>: <code>BoxCreator</code> 제거, <code>activation_fn=nn.ReLU</code> 통합</li>
+  </ul>
+
+  <h3>2.4 커리큘럼 학습(안전형)</h3>
+  <ul>
+    <li>최근 에피소드 성과 기반 난이도(박스 수) 점진 증가</li>
+    <li>연속 성공(patience) 충족 시 단계 상승, 불안정 시 유지</li>
+  </ul>
+
+  <h3>2.5 HPO 파이프라인</h3>
+  <ul>
+    <li><b>정밀 최적화</b>(<code>enhanced_optimization.py</code>): 전략별 다중 실험 → 최적 조합</li>
+    <li><b>최종 검증</b>(<code>production_final_test.py</code>): 50 에피소드 반복평가로 재현성 확인</li>
+  </ul>
+</div>
+
+<div class="sec">
+  <h2>3. 지원 실적 (정량/정성)</h2>
+
+  <h3>3.1 정량 성과</h3>
+  <table>
+    <tr><th>지표</th><th>성과</th><th>근거</th></tr>
+    <tr><td>Phase4 Best Combined</td><td>19.576</td><td>results/phase4_enhanced_all_0804a.json (arch_reinforced)</td></tr>
+    <tr><td>최종 평균 보상 (No Curri)</td><td>6.8344</td><td>results/ultimate_results0717_noCurri.txt</td></tr>
+    <tr><td>최종 평균 보상 (Curri)</td><td>5.8725</td><td>results/ultimate_results0717_Curri.txt</td></tr>
+    <tr><td>학습 시간 (No Curri)</td><td>172.8초</td><td>same as above</td></tr>
+    <tr><td>학습 시간 (Curri)</td><td>137.7초</td><td>same as above</td></tr>
+  </table>
+
+  <h3>3.2 정성 성과</h3>
+  <ul>
+    <li>경량 MLP로 빠른 반복실험 및 운영 용이성 확보</li>
+    <li>실시간 모니터링/대시보드/GIF로 가시성 강화</li>
+    <li>커리큘럼·Masking·보상설계로 학습 안정화 및 수렴 가속</li>
+  </ul>
+</div>
+
+<div class="sec">
+  <h2>4. 문제점 및 개선사항</h2>
+  <ul>
+    <li>단기 실험에서 커리큘럼 기본 설정이 보상 평균 소폭 저하 → <b>난이도 상승 조건/속도 재튜닝</b></li>
+    <li>장시간 학습 시 성능 분산 → 평가 주기 세분화, 조기중단 규칙 강화</li>
+    <li>대형 박스 시 초기 결정 치명성 → 초기 탐색 강화, 온정책 보상 미세조정</li>
+  </ul>
+</div>
+
+<div class="sec">
+  <h2>5. 성과 및 기대효과</h2>
+  <ul>
+    <li><b>실용화</b>: 일반 GPU 1장 기준 단시간 재학습/배포</li>
+    <li><b>비용 절감</b>: Transformer 미사용으로 인프라 비용 절감</li>
+    <li><b>현장 이득</b>: 인력 운영 효율화, 적재 품질/속도 향상</li>
+  </ul>
+</div>
+
+<div class="sec">
+  <h2>6. 향후 계획</h2>
+  <ul>
+    <li><b>커리큘럼 재튜닝</b>: 박스 수 증가 단계 임계/윈도우/보상 조건 개선</li>
+    <li><b>속도 최적화</b>: 60초 내 학습 목표(롤아웃/로딩 병렬화)</li>
+    <li><b>모델 고도화</b>: MLP + Self-Attention 하이브리드 탐색</li>
+  </ul>
+</div>
+
+<div class="sec">
+  <h2>7. 첨부 및 근거자료</h2>
+  <ul>
+    <li><code>results/</code>: phase4_enhanced_all_0804a.json, ultimate_results0717_*.txt, *.png</li>
+    <li><code>models/</code>: 학습 결과 zip</li>
+    <li><code>logs/</code>: 모니터링 CSV/텐서보드 로그</li>
+    <li><code>docs/</code>: Code동작 기술서.md 외</li>
+  </ul>
+  <div class="small">참고: Combined Score = 0.3×mean_reward + 0.7×(mean_utilization×100)</div>
+</div>
+
+<div class="sec small">
+  <div><b>작성일</b> : 2025-09-03</div>
+  <div><b>작성자</b> : 박정우</div>
+</div>
+
+</body>
+</html>
