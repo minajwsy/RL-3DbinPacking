@@ -1,7 +1,7 @@
 ## 1. 개요
 
 ### **1.1 POC 개발의 목적**
-본 코드베이스는 기존 공항 수하물의 수작업에 의한 ULD 적재 처리 현장에서 인력관리, 작업효율 저하 등의 고질적인 문제를 극복하기 위하여 강화학습 AI 기술을 도입하여 ULD 적재 처리를 자동화하기 위한 POC를 개발하고자 하는 시도이다. 여기에서는 현재 이 분야의 SOTA 논문에서 제안된 Transformer 기반의 정책 대신, 계산 효율성이 높은 **MLP (Multi-Layer Perceptron) 정책**과 **MaskablePPO**를 결합하여 ULD 적재의 핵심 알고리듬인 3D Bin Packing 문제를 해결하고자 한다. 이를 위해 논문의 핵심 아이디어인 **Height Map 상태 표현**과 **Action Masking**을 동일하게 채택하되, 실용성을 고려하여 3D Bin Packing 환경에서 경량화된 강화학습(Maskable PPO) 모델로도 컨테이너 활용률의 최대화라라는 관점에서 유사한 수준의 성능에 도달하는 것을 목표로 한다. 
+본 코드베이스는 기존 공항 수하물의 수작업에 의한 ULD 적재 처리 현장에서 인력관리, 작업효율 저하 등의 고질적인 문제를 극복하기 위하여 강화학습 AI 기술을 도입하여 ULD 적재 처리를 자동화하기 위한 POC를 개발하고자 하는 시도이다. 여기에서는 현재 이 분야의 SOTA 논문에서 제안된 Transformer 기반의 정책 대신, 계산 효율성이 높은 **MLP (Multi-Layer Perceptron) 정책**과 **MaskablePPO**를 결합하여 ULD 적재의 핵심 알고리듬인 3D Bin Packing 문제를 해결하고자 한다. 이를 위해 논문의 핵심 아이디어인 **Height Map 상태 표현**과 **Action Masking**을 동일하게 채택하되, 실용성을 고려하여 3D Bin Packing 환경에서 경량화된 강화학습(Maskable PPO) 모델로도 컨테이너 활용률의 최대화라는 관점에서 유사한 수준의 성능에 도달하는 것을 목표로 한다. 
   
 ### **1.2 최상위 실행 코드**
   - `enhanced_optimization.py`: 하이퍼파라미터 탐색/비교 자동화.
@@ -277,175 +277,43 @@ flowchart TD
 ---
 
 ## 5. 핵심 데이터 구조
-
-| 항목 | 정의 | 
-| :--- | :--- | 
-| **상태 (Observation)** | `obs = {'height_map', 'visible_box_sizes'}` | 
-| **액션 (Action)** | `Discrete(W * H * 6)` | 
-| **액션 마스크 (Action Mask)** | `get_action_masks()`가 반환하는 `bool` 배열 |
-| **주요 평가지표** | `combined_score = 0.3*reward + 0.7*utilization*100` |
-
- 다음에 코드 라인 인용과 함께 핵심 데이터 구조와 수식을 정리한다.
-
+AI가 “무엇을 보고(obs) → 무엇을 할 수 있고(action) → 무엇은 미리 걸러지며(mask) → 어떻게 점수를 받는지(reward/score) → 그 결과 바닥이 어떻게 변하는지(height_map)”가 한눈에 들어오도록 핵심을 설명한다.
 ### **5.1 관측(Observation) 공간**
+  - 높이맵 `height_map`: 컨테이너 바닥의 현재 상태로서, 위에서 내려다본 "지형도"라고 생각하면 된다. 각 격자 칸마다 블록이 얼마나 높이 쌓였는지가 숫자로 담긴 벡터(길이 `X*Y`)로 표시된다.
+  - 가시 박스 `visible_box_sizes`: 다음에 놓아야 할 박스 K개의 크기 `[가로, 세로, 높이]`를 펼친 벡터(길이 `K*3`).
+    (예: [[2,3,1], [1,1,2], [4,2,1]]=첫번째: 2×3×1, 두번째: 1×1×2, 세번째: 4×2×1) 
+  - 직관: “지금 바닥 어디가 높고 낮은지” + “곧 놓을 박스들이 어떤 크기인지”를 한번에 본다.
 
-- 형태
-  - height_map: \(H \in \mathbb{N}^{X \times Y}\), 컨테이너 상면의 높이맵. 학습 입출력 시 1차원으로 평탄화된 길이 \(X \cdot Y\)의 벡터.
-  - visible_box_sizes: \(B \in \mathbb{N}^{K \times 3}\), 가시 박스들의 \([x,y,z]\) 크기. 학습 입출력 시 길이 \(K \cdot 3\)의 벡터.
-
-- 코드 정의
-```1:159:src/packing_env.py
-# ...
-# Observation space
-self.observation_space = gym.spaces.Dict(observation_dict)
-# Action space
-self.action_space = Discrete(
-    container_size[0] * container_size[1] * num_visible_boxes
-)
-```
-
-```147:151:src/packing_env.py
-observation_dict = {
-    "height_map": MultiDiscrete(height_map_repr),
-    "visible_box_sizes": MultiDiscrete(box_repr),
-}
-```
-
-- 범위/타입
-  - MultiDiscrete 상한은 “비포함”이므로, 내부 배열에 +1을 더해 상한을 설정한다.
-  - height_map는 `np.int64`로 평탄화; visible_box_sizes는 각 축 별 상한이 컨테이너 크기(+1)이다.
-```138:145:src/packing_env.py
-height_map_repr = np.ones(
-    shape=(container_size[0], container_size[1]), dtype=np.int64
-) * (container_size[2] + 1)
-height_map_repr = np.reshape(
-    height_map_repr, newshape=(container_size[0] * container_size[1],)
-)
-```
-```131:137:src/packing_env.py
-box_repr = np.zeros(shape=(num_visible_boxes, 3), dtype=np.int32)
-box_repr[:] = self.container.size + [1, 1, 1]
-box_repr = np.reshape(box_repr, newshape=(num_visible_boxes * 3,))
-```
-
-- 가시 박스가 모자랄 때 dummy 박스가 채워져 관측에 들어간다.
-```386:396:src/packing_env.py
-dummy_box_size = self.container.size
-num_dummy_boxes = self.num_visible_boxes - len(self.unpacked_visible_boxes)
-box_size_list = [box.size for box in self.unpacked_visible_boxes] + [dummy_box_size] * num_dummy_boxes
-self.state["visible_box_sizes"] = np.reshape(box_size_list, (self.num_visible_boxes * 3,))
-```
-
-### **5.2 액션(Action) 공간과 인코딩**
-
-- 크기: `Discrete(X*Y*K)`
-- 인덱스 → 의미 매핑
-  - \(b = \left\lfloor \frac{a}{X\cdot Y} \right\rfloor\): 가시 박스 인덱스
-  - \(r = a \bmod (X\cdot Y)\)
-  - 코드 구현 기준 좌표: \(x = \left\lfloor \frac{r}{X} \right\rfloor,\; y = r \bmod X\)
-    - 주석 설명과 `X/Y` 축 사용이 다소 상이하다. 아래는 “현재 코드” 기준이다.
-```185:206:src/packing_env.py
-box_index = action // (self.container.size[0] * self.container.size[1])
-res = action % (self.container.size[0] * self.container.size[1])
-position = np.array([res // self.container.size[0], res % self.container.size[0]])
-return box_index, position.astype(np.int32)
-```
-
-- 좌표 → 인덱스
-```208:220:src/packing_env.py
-action = (box_index * self.container.size[0] * self.container.size[1]
-          + position[0] * self.container.size[0]
-          + position[1])
-```
+### **5.2 액션(Action) 공간**
+  - 하나의 정수로 표현되는 `Discrete(X*Y*K)`.
+  - 의미: “K개 중 어떤 박스(b)를, 바닥 좌표(x,y) 어디에 둘까?”
+  - 인덱스 해석(직관): 액션 번호로부터 박스(b) 및 위치(r)를 도출하는 로직은 b = 액션 ÷ (X*Y) 및 r = 액션 % (X*Y)로 표현된다.
 
 ### **5.3 액션 마스크(Action Mask)**
+  - 물리적으로 불가능한 액션을 사전에 걸러내서 AI가 헛수고를 하지 않도록 하기 위한 길이 'K*X*Y`의 불리언 벡터로서 True만 선택 가능하다.
+  - False(불가) 예시: 컨테이너 밖으로 나감, 바닥이 평평하지 않음, 지지 면적이 부족, 다른 박스와 충돌.
+  - 효과: “말이 안 되는 선택”을 사전에 제거해 학습을 빠르고 안정적으로 만든다.
 
-- 형태: 길이 \(K \cdot X \cdot Y\)인 불리언(또는 0/1) 벡터. 내부적으로는 \([K, X\cdot Y]\)를 평탄화.
-- 각 가시 박스마다 `Container.action_mask(box)`를 계산해 가능한 \((x,y)\)를 표시.
-```400:422:src/packing_env.py
-act_mask = np.zeros((self.num_visible_boxes, self.container.size[0] * self.container.size[1]), dtype=np.int8)
-for index in range(len(self.unpacked_visible_boxes)):
-    acm = self.container.action_mask(box=self.unpacked_visible_boxes[index], check_area=100)
-    act_mask[index] = np.reshape(acm, (self.container.size[0] * self.container.size[1],))
-return [x == 1 for x in act_mask.flatten()]
-```
+### **5.4 보상(Reward)과 결합 점수(Combined Score)**
+  - 기본 보상: 최종 활용률(SUR)(= (채워넣은 박스들의 총 부피) ÷ (컨테이너 전체 부피)) + 중간 단계의 조밀도/효율 보상.
+  - 개선 보상(`ImprovedRewardWrapper`): 활용률 증가 보너스, 배치 성공 보너스, 시간/실패 페널티 등으로 학습 신호를 강화.
+  - 최종 평가 지표(결합 점수): `0.3 * 평균 보상 + 0.7 * (평균 활용률 * 100)` → “잘 채웠는가”를 더 크게 반영함.
 
-- 유효 위치의 판정 수식 (`check_valid_box_placement` 함수의 동작 요약)
-  1) 컨테이너 내부 포함성: 박스 바닥 4점이 경계 내
-  2) 바닥 4점의 높이 일치: \(H[v0]=H[v1]=H[v2]=H[v3]\)
-  3) 바닥 면 전체의 최대 높이와 코너 높이 일치: \(\max(H[\text{면}]) = \text{lev}\)
-  4) 지지 면적 비율 ≥ `check_area`(%)  
-     \(\text{support\_perc} = \frac{\#\{H=\text{lev}\}}{w\cdot h}\cdot 100 \ge \text{check\_area}\)
-  5) 컨테이너 내 완전 적합: `cuboid_fits(container, box)`
-  6) 기존 박스와의 충돌 없음: `not cuboids_intersection(...)`
+### **5.5 높이맵(Height Map) 갱신(박스 놓기)**
+  - 박스를 (x,y)에 놓으면, 그 박스가 덮는 격자 칸들의 높이가 '박스 높이'만큼 올라간다.  
+  (예: 2×2 상자(높이 3)를 (0,0)에 놓으면→ 표의 (0,0),(0,1),(1,0),(1,1) 칸이 각각 +3으로 증가)
+  - 직관: 해당 구역의 바닥이 그만큼 더 높아진다.
 
-### **5.4 보상(Reward) 수식**
+### **5.6 박스 생성(boxes_generator) 동작**
+  - 컨테이너 부피를 기준으로 분할을 반복해 `num_items`개의 박스 크기를 만든다(부피 보존).
+  - 직관: “이론상 꽉 채우기 쉬운 조합”이 자주 나오도록 생성.
 
-- 기본 환경 보상
-  - 종료 보상: \(R_{\text{terminal}} = \frac{\sum \text{placed\_vol}}{\text{container\_vol}}\)
-  - 중간 보상: \(R_{\text{interm}} = \frac{\sum \text{placed\_vol}}{(x_{\max}-x_{\min})(y_{\max}-y_{\min})(z_{\max}-z_{\min})}\)
-```279:307:src/packing_env.py
-if reward_type == "terminal_step":
-    reward = packed_volume / container_volume
-elif reward_type == "interm_step":
-    reward = packed_volume / ((max_x-min_x)*(max_y-min_y)*(max_z-min_z))
-```
-
-- ImprovedRewardWrapper(선택적)로 보상 쉐이핑
-  - 활용률 개선 보상: \(\Delta u > 0 \Rightarrow +2.0 \cdot \Delta u\)
-  - 박스 배치 보상: \(\Delta n > 0 \Rightarrow +0.5 \cdot \Delta n\)
-  - 효율 보너스: \(+0.1 \cdot (1 - \frac{\text{step}}{\text{max\_steps}})\)
-  - 안정성 보너스: \(|\Delta u|<0.1 \land u>0.3 \Rightarrow +\text{증분}\)
-  - 종료 보너스: \(u>0.8\Rightarrow +5.0;\; u>0.6\Rightarrow +2.0;\; u>0.4\Rightarrow +1.0;\) else \(-1.0\)
-  - 지연 페널티: \(\text{step} > 0.8\cdot \text{max\_steps} \Rightarrow -0.01\)
-  - 실패 페널티: \(\text{truncated} \land u<0.3 \Rightarrow -2.0\)
-
-- 활용률(평가 계산)
-  - \(u = \frac{\sum_{\text{placed}} w\cdot h\cdot d}{X\cdot Y\cdot Z}\)
-
-### **5.5 결합 점수(Combined Score)**
-
-- HPO/평가지표:  
-  \(\text{Combined} = 0.3\cdot \overline{R} + 0.7\cdot (100\cdot \overline{u})\)s
-
-### **5.6 높이맵(Height Map) 갱신**
-
-- 박스 배치 시 영역 합산:  
-  \(H[x:x+w,\; y:y+h] \mathrel{+}= z\)
-```276:287:src/packing_kernel.py
-self.height_map[
-    box.position[0] : box.position[0] + box.size[0],
-    box.position[1] : box.position[1] + box.size[1],
-] += box.size[2]
-```
-
-### **5.7 박스 생성(boxes_generator) 동작의 개요**
-
-- 컨테이너 크기를 시작으로, 부피/중심치 편향 가중으로 축을 선택하여 이분 분할을 반복해 총 `num_items` 크기 집합 생성. 부피 보존.  
-  결과는 컨테이너에 “이론상” 꽉 채울 수 있는 조합을 만들 확률이 높음.
-
-
-### **5.8 핵심 자료구조 요약**
-
-- `Container`
-  - `size=[X,Y,Z]`, `height_map ∈ ℕ^{X×Y}`, `boxes: List[Box]`
-  - `action_mask(box) → {0,1}^{X×Y}`, `place_box`, `check_valid_box_placement`
-- `Box`
-  - `size=[w,h,d]`, `position=[x,y,z] or [-1,-1,-1]`, `volume=w·h·d`
-- `PackingEnv`
-  - 관측: `{"height_map": flat(X·Y), "visible_box_sizes": flat(K·3)}`
-  - 액션: `Discrete(X·Y·K)`; 인덱스→좌표 매핑은 위 수식(코드 기준)
-  - 마스크: 길이 `K·X·Y` 불리언
-  - 보상: 종료/중간식 + (옵션) 개선 보상 래퍼
-
-간단 요약
-- 관측은 높이맵(X·Y)과 가시 박스(K·3)를 평탄화한 `Dict` 구조.
-- 액션은 `Discrete(X·Y·K)`로, 인덱스를 박스 선택과 (x,y) 위치로 복원.
-- 마스크는 박스별 유효 좌표를 결합해 길이 `K·X·Y`의 불리언 벡터로 제공.
-- 보상은 기본(종료/중간) 공식에 더해 개선 래퍼가 단계별 가중 보상/페널티를 추가.
-- 최적화 목적은 `0.3*보상 + 0.7*(활용률*100)`의 결합 점수.
+### **5.7 핵심 클래스 요약**
+  - `Container`: 컨테이너 크기·`height_map`·배치/검증/마스크 계산.
+  - `Box`: 박스의 크기(가로, 세로, 높이)·부피를 표현한다.
+  - `PackingEnv`: 관측(dict) 및 액션(`Discrete`)을 정의하고, 보상을 계산하며, 상태를 갱신한다. 마스크는 내부 `Container` 로직을 활용함. 
+<br>이 세 클래스가 합쳐져 3D 테트리스 세계와 같은 환경을 구성한다고 보면 된다.
 ---
-
 ## 6. 디렉토리 및 파일의 구조
 
 ```
