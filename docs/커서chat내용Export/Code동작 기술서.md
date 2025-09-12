@@ -4,14 +4,14 @@
 본 코드베이스는 기존 공항 수하물의 수작업에 의한 ULD 적재 처리 현장에서 인력관리, 작업효율 저하 등의 고질적인 문제를 극복하기 위하여 강화학습 AI 기술을 도입하여 ULD 적재 처리를 자동화하기 위한 POC를 개발하고자 하는 시도이다. 여기에서는 현재 이 분야의 SOTA 논문에서 제안된 Transformer 기반의 정책 대신, 계산 효율성이 높은 **MLP (Multi-Layer Perceptron) 정책**과 **MaskablePPO**를 결합하여 ULD 적재의 핵심 알고리듬인 3D Bin Packing 문제를 해결하고자 한다. 이를 위해 논문의 핵심 아이디어인 **Height Map 상태 표현**과 **Action Masking**을 동일하게 채택하되, 실용성을 고려하여 3D Bin Packing 환경에서 경량화된 강화학습(Maskable PPO) 모델로도 컨테이너 활용률의 최대화라는 관점에서 유사한 수준의 성능에 도달하는 것을 목표로 한다. 
   
 ### **1.2 최상위 실행 코드**
-  - `enhanced_optimization.py`: 하이퍼파라미터 탐색/비교 자동화.
+  - `enhanced_optimization.py`: 네트워크 구조 및 하이퍼파라미터의 탐색/비교 자동화/최적화.
   - `production_final_test.py`: 전 단계에서 도출된 최적 설정으로 학습→평가→결과 저장.
   - `README.md`: 문제 정의, 설치, 환경 소개.
   - `results/`, `models/`, `logs/`, `gifs/`: 실행 산출물 저장.
 
 ### **1.3 핵심 모듈**
   - `packing_env.py`
-    - Gymnasium 환경 `PackingEnv`: 관측공간 Dict(height_map, visible_box_sizes), 액션공간 Discrete(lx*ly*visible).
+    - Gymnasium 환경 `PackingEnv`: 관측공간 Dict(height_map, visible_box_sizes), 액션공간 Discrete(X*Y*K).
     - `action_masks()`: 불가능 좌표/박스 조합을 배제하는 마스크 제공.
     - `calculate_reward(...)`: 종료/중간 보상(활용률 기반).
   - `train_maskable_ppo.py`
@@ -31,10 +31,17 @@
     - 전체: `python enhanced_optimization_annotated.py --focus all --timesteps 35000`
     - 안정성/아키텍처/최적화만: `--focus stability|architecture|optimization`
     - 결과 분석: `--analyze results/phase4_enhanced_*.json`
-  - 프로덕션 최종 테스트:
-    - 완전: `python production_final_test_annotated.py --timesteps 50000 --episodes 50`
-    - 빠른: `python production_final_test_annotated.py --quick`
+  - 프로덕션 버전의 최종 테스트:
+    - 완전한 형태: `python production_final_test.py`
+    - 빠른 형태: `python production_final_test.py --quick`
   - 루트에서 실행해야 `sys.path.append('src')`가 올바르게 동작한다.
+  - 구체적 실행 절차: 1.%cd RL-3DbinPacking
+                     2.venv-setup1of3-manually.sh의 본문 전체를 터미널에 복붙하여 실행
+                     3.%chmod +x ven*
+                     4.%./venv-setup2of3.sh
+                     5.%./venv-setup3of3.sh  # -> 가상환경의 셋업 과정: 터미널에 (.venv) 표시가 뜨는지 확인
+                     6.%python enhanced_optimization.py --focus all --timesteps 35000
+                     7.%python production_final_test.py # -> 끝에 --timesteps 50000 --episodes 50 형식으로 옵션 추가해 주는 방법도 가능할 듯
 
 ### **1.6 참고 논문과의 관련성 검토**
   - 참고 논문이 Transformer 정책을 사용하는 것과 달리 본 코드는 Transformer 정책 대신에 MLP 정책 + MaskablePPO를 사용한다.
@@ -54,8 +61,8 @@
 
 | 파일 경로 | 목적 | 논문 관점의 역할 |
 | :--- | :--- | :--- |
-| **`enhanced_optimization.py`** | **정밀 하이퍼파라미터 탐색**: 8가지 전략(stability, architecture, optimization)을 병렬로 학습하고 비교 분석한다. | 논문의 **"Ablation Studies"** (Table 5)와 유사. 다양한 하이퍼파라미터 조합의 성능을 체계적으로 비교하여 최적 설정을 도출한다. |
-| **`production_final_test.py`** | **최적화 결과의 최종 검증**: `enhanced_optimization.py`에서 도출된 최적 설정(`PRODUCTION_OPTIMAL`)을 고정하여, 대규모(50 에피소드) 반복 테스트로 성능의 안정성과 재현성을 검증한다. | 논문의 **"Performance Comparison"** (Table 4)의 *Best-Config 재현 실험* 단계와 유사. 최종 제안 모델의 성능을 보고하기 위한 검증 단계이다. |
+| **`enhanced_optimization.py`** | **정밀 하이퍼파라미터 탐색**: 8가지 전략(stability, architecture, optimization)을 병렬적으로 학습하고 비교 분석한다. | 논문의 **"Ablation Studies"** (Table 1)와 유사. 다양한 하이퍼파라미터 조합의 성능을 체계적으로 비교하여 최적 설정을 도출한다. |
+| **`production_final_test.py`** | **최적화 결과의 최종 검증**: `enhanced_optimization.py`에서 도출된 최적 설정(`PRODUCTION_OPTIMAL`)을 고정하여, 대규모(50 에피소드) 반복 테스트로 성능의 안정성과 재현성을 검증한다. | 논문의 **"Performance Comparison"** (Table 1) 단계와 유사. 최종 제안 모델의 성능을 보고하기 위한 검증 단계이다.
 
 ---
 
@@ -154,30 +161,30 @@ graph TD
 
 ```mermaid
 flowchart TD
-    A["🔧 CLI/스크립트 인자<br/>(num_boxes, timesteps, seed, net_arch)"] --> B["⚙️ 설정/초기화<br/>• 환경 등록(gym.register)<br/>• RNG/시드 설정<br/>• 로깅 디렉토리 생성"]
+    A["🔧 CLI/스크립트 인자<br/>(num_boxes, timesteps,<br>seed, net_arch)"] --> B["⚙️ 설정/초기화<br/>• 환경 등록(gym.register)<br/>• RNG/시드 설정<br/>• 로깅 디렉토리 생성"]
     
-    B --> C["📦 데이터(박스 리스트) 생성<br/>utils.boxes_generator → box_sizes"]
+    B --> C["📦 데이터(박스 리스트) 생성<br/>utils.boxes_generator<br>→ box_sizes"]
     
-    C --> D["🏗️ 환경 생성<br/>gym.make('PackingEnv-v0')<br/>초기 관측: {height_map, visible_box_sizes}"]
+    C --> D["🏗️ 환경 생성<br/>gym.make('PackingEnv-v0')<br/>초기 관측: {height_map,<br>visible_box_sizes}"]
     
-    D --> E["🎁 ImprovedRewardWrapper<br/>(보상 shaping)"]
-    D --> F["🎭 ActionMasker<br/>(get_action_masks)"]
-    D --> G["📊 Monitor/DummyVecEnv<br/>(로깅, 벡터화)"]
+    D --> E["🎁ImprovedRewardWrapper<br/>(보상 shaping)"]
+    D --> F["🎭ActionMasker<br/>(get_action_masks)"]
+    D --> G["📊Monitor/DummyVecEnv<br/>(로깅, 벡터화)"]
     
-    E --> H["🤖 에이전트/정책 생성<br/>MaskablePPO('MultiInputPolicy')"]
+    E --> H["🤖 에이전트/정책 생성<br/>MaskablePPO<br>('MultiInputPolicy')"]
     F --> H
     G --> H
     
-    H --> I["🔄 학습 루프<br/>model.learn(total_timesteps)"]
+    H --> I["🔄 학습 루프<br/>model.learn<br>(total_timesteps)"]
     
     I --> J["학습 스텝 반복"]
     
     subgraph "학습 반복 과정"
-        K["1️⃣ 관측 obs_t 수집"] --> L["2️⃣ get_action_masks(env) → mask_t"]
-        L --> M["3️⃣ 정책 π(a|s,mask) → action_t"]
-        M --> N["4️⃣ env.step(action_t) → 다음 상태"]
-        N --> O["5️⃣ ImprovedRewardWrapper가 보상 shaping"]
-        O --> P["6️⃣ Monitor가 로그 기록"]
+        K["1️⃣관측 obs_t 수집"] --> L["2️⃣get_action_masks(env)<br>→ mask_t"]
+        L --> M["3️⃣정책 π(a|s,mask)<br>→ action_t"]
+        M --> N["4️⃣env.step(action_t)<br>→ 다음 상태"]
+        N --> O["5️⃣ImprovedRewardWrapper<br>가 보상 shaping"]
+        O --> P["6️⃣Monitor가 로그 기록"]
     end
     
     J --> K
@@ -185,7 +192,7 @@ flowchart TD
     Q -->|No| J
     Q -->|Yes| R["📈 평가 루프<br/>(deterministic/with masks)"]
     
-    R --> S["📊 지표 산출/저장<br/>• mean_reward, mean_utilization<br/>• success_rate<br/>• combined_score = 0.3×reward + 0.7×utilization×100"]
+    R --> S["📊 지표 산출/저장<br/>• mean_reward,<br>  mean_utilization<br/>• success_rate<br/>• combined_score<br>= 0.3×reward +<br>0.7×utilization×100"]
     
     S --> T["💾 결과 저장<br/>logs/, models/, results/"]
     
@@ -297,7 +304,7 @@ AI가 “무엇을 보고(obs) → 무엇을 할 수 있고(action) → 무엇�
 ### **5.4 보상(Reward)과 결합 점수(Combined Score)**
   - 기본 보상: 최종 활용률(SUR)(= (채워넣은 박스들의 총 부피) ÷ (컨테이너 전체 부피)) + 중간 단계의 조밀도/효율 보상.
   - 개선 보상(`ImprovedRewardWrapper`): 활용률 증가 보너스, 배치 성공 보너스, 시간/실패 페널티 등으로 학습 신호를 강화.
-  - 최종 평가 지표(결합 점수): `0.3 * 평균 보상 + 0.7 * (평균 활용률 * 100)` → “잘 채웠는가”를 더 크게 반영함.
+  - 최종 평가지표(결합 점수): `0.3 * 평균 보상 + 0.7 * (평균 활용률 * 100)` → “잘 채웠는가”를 더 크게 반영함.
 
 ### **5.5 높이맵(Height Map) 갱신(박스 놓기)**
   - 박스를 (x,y)에 놓으면, 그 박스가 덮는 격자 칸들의 높이가 '박스 높이'만큼 올라간다.  
@@ -312,7 +319,7 @@ AI가 “무엇을 보고(obs) → 무엇을 할 수 있고(action) → 무엇�
   - `Container`: 컨테이너 크기·`height_map`·배치/검증/마스크 계산.
   - `Box`: 박스의 크기(가로, 세로, 높이)·부피를 표현한다.
   - `PackingEnv`: 관측(dict) 및 액션(`Discrete`)을 정의하고, 보상을 계산하며, 상태를 갱신한다. 마스크는 내부 `Container` 로직을 활용함. 
-<br>이 세 클래스가 합쳐져 3D 테트리스 세계와 같은 환경을 구성한다고 보면 된다.
+<br>이 세 클래스가 합쳐져 "3D 테트리스 세계"와 같은 환경을 구성한다고 보면 된다.
 ---
 ## 6. 디렉토리 및 파일의 구조
 
@@ -332,55 +339,6 @@ RL-3DbinPacking/
 └── models/                          # 학습된 모델 저장
     └── production_optimal_*.zip
 ```
-
-이 문서는 두 실행 스크립트와 직접적으로 연관된 파일만을 대상으로, 논문의 이론적 배경과 코드의 실제 구현을 연결하여 작성되었다.
-
-```plaintext
-graph TD
-    subgraph "Phase 1: Hyperparameter Optimization"
-        A[enhanced_optimization.py] -- "8가지 설정" --> B{Loop}
-        B -- "각 설정" --> C[make_env]
-        C --> D[MaskablePPO 학습]
-        D --> E[25 에피소드 평가]
-        E --> F[results/phase4_*.json]
-    end
-
-    subgraph "Phase 2: Final Verification"
-        G[production_final_test.py] -- "최적 설정 로드" --> H[make_env]
-        H --> I[MaskablePPO 재학습]
-        I --> J[50 에피소드 평가]
-        J --> K[results/production_final_*.json]
-    end
-
-    C -- "물리 연산" --> L(packing_kernel.py)
-    H -- "물리 연산" --> L
-    D -- "Action Mask" --> M(train_maskable_ppo.py)
-    I -- "Action Mask" --> M
-```
-
-```plaintext
-RL-3DbinPacking/
-├── enhanced_optimization.py         # HPO 실행
-├── production_final_test.py         # 최종 검증 실행
-├── requirements.txt                 # Python 의존성
-├── src/                             # 핵심 로직
-│   ├── train_maskable_ppo.py
-│   ├── packing_env.py
-│   ├── packing_kernel.py
-│   └── utils.py
-├── results/                         # 결과 저장
-│   ├── phase4_enhanced_all_*.json
-│   └── production_final_*.json
-└── models/                          # 학습된 모델 저장
-    └── production_optimal_*.zip
-```
----
-**User**
-@RL-3DbinPacking/ 위 답변의 '6. 주요 디렉토리 및 파일 구조' 부분에 대해 상세한 설명을 추가해줘
----
-**Cursor**
-
-간단 상태: `src/` 핵심 모듈과 학습/최적화/검증/디버깅 스크립트 전반을 확인해, 파일-기능 대응으로 정리하였다.
 
 ### **6.1 디렉토리 개요**
 - `src/`: 환경, 커널, 학습 유틸의 핵심 코드
