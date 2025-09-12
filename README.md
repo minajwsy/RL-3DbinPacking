@@ -126,5 +126,3 @@ python -m src.train_maskable_ppo --analyze-only results/comprehensive_training_s
 - **활용률**: 🥇 우수(80%+) / 🥈 양호(60-80%) / 🥉 개선필요(60%-)
 - **성공률**: 🥇 우수(80%+) / 🥈 양호(50-80%) / 🥉 개선필요(50%-)
 - **학습 안정성**: 🥇 매우안정적(0.7+) / 🥈 안정적(0.5-0.7) / 🥉 불안정(0.5-)
-
-📖 **자세한 사용법**: [`REALTIME_MONITORING_GUIDE.md`](REALTIME_MONITORING_GUIDE.md) 를 참조하세요.
